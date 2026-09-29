@@ -1,4 +1,4 @@
-import { ESPN_PRO_TEAMS, getGameStates, stateFor } from "@/lib/nfl";
+import { ESPN_PRO_TEAMS, gameFor, getGameStates, paceOf } from "@/lib/nfl";
 import { progressOf, sortPlayers, toSide, type LeagueWeek, type Matchup, type PlayerLine, type TeamWeek } from "./types";
 
 // ESPN has no official API; this is the same endpoint fantasy.espn.com uses.
@@ -24,7 +24,14 @@ interface RosterEntry {
   playerPoolEntry?: {
     id?: number;
     appliedStatTotal?: number;
-    player?: { id?: number; fullName?: string; proTeamId?: number; defaultPositionId?: number };
+    player?: {
+      id?: number;
+      fullName?: string;
+      proTeamId?: number;
+      defaultPositionId?: number;
+      // statSourceId 0 = actual, 1 = projected; appliedTotal is in the league's scoring.
+      stats?: { scoringPeriodId?: number; statSourceId?: number; appliedTotal?: number }[];
+    };
   };
 }
 interface ScheduleSide {
@@ -131,14 +138,19 @@ export async function getEspnLeagueWeek(
     const players: PlayerLine[] = (s.rosterForCurrentScoringPeriod?.entries ?? []).map((e, i) => {
       const p = e.playerPoolEntry?.player;
       const nflTeam = p?.proTeamId ? ESPN_PRO_TEAMS[p.proTeamId] : undefined;
+      const game = gameFor(states, nflTeam);
+      const points = e.playerPoolEntry?.appliedStatTotal ?? 0;
+      const projected = p?.stats?.find((s) => s.statSourceId === 1 && s.scoringPeriodId === week)?.appliedTotal;
       return {
         id: String(e.playerId ?? p?.id ?? e.playerPoolEntry?.id ?? `slot-${i}`),
         name: p?.fullName ?? "Unknown player",
         pos: POSITIONS[p?.defaultPositionId ?? 0] ?? "",
         nflTeam,
-        points: e.playerPoolEntry?.appliedStatTotal ?? 0,
+        points,
+        projected,
+        pace: paceOf(points, projected, game),
         starter: !BENCH_SLOTS.has(e.lineupSlotId ?? 20),
-        state: stateFor(states, nflTeam),
+        state: game.state,
       };
     });
     return {

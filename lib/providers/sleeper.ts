@@ -1,5 +1,5 @@
 import { unstable_cache } from "next/cache";
-import { getGameStates, stateFor } from "@/lib/nfl";
+import { gameFor, getGameStates, paceOf } from "@/lib/nfl";
 import { progressOf, sortPlayers, toSide, type LeagueWeek, type Matchup, type PlayerLine, type TeamWeek } from "./types";
 
 // Sleeper's public API: https://docs.sleeper.com (no auth required).
@@ -49,7 +49,43 @@ const getPlayers = unstable_cache(
   { revalidate: 43200 }
 );
 
-interface League { league_id: string; name: string }
+// Projected stat lines per player (not documented by Sleeper, so failures just mean no projections).
+const getProjectionStats = unstable_cache(
+  async (season: string, week: number): Promise<Record<string, Record<string, number>>> => {
+    const positions = ["QB", "RB", "WR", "TE", "K", "DEF"].map((p) => `position%5B%5D=${p}`).join("&");
+    try {
+      const res = await fetch(
+        `https://api.sleeper.com/projections/nfl/${season}/${week}?season_type=regular&${positions}`,
+        { cache: "no-store" }
+      );
+      if (!res.ok) return {};
+      const rows = (await res.json()) as { player_id?: string; stats?: Record<string, number> }[];
+      const out: Record<string, Record<string, number>> = {};
+      for (const r of rows ?? []) if (r.player_id && r.stats) out[r.player_id] = r.stats;
+      return out;
+    } catch {
+      return {};
+    }
+  },
+  ["sleeper-projections-v1"],
+  { revalidate: 3600 }
+);
+
+// Score a projected stat line with the league's own scoring settings.
+function projectedPoints(stats: Record<string, number> | undefined, scoring: Record<string, number>) {
+  if (!stats) return undefined;
+  let total = 0;
+  for (const [stat, value] of Object.entries(scoring)) {
+    if (typeof stats[stat] === "number") total += stats[stat] * value;
+  }
+  if (total === 0) {
+    const rec = scoring.rec ?? 0;
+    total = (rec >= 1 ? stats.pts_ppr : rec > 0 ? stats.pts_half_ppr : stats.pts_std) ?? 0;
+  }
+  return Math.round(total * 100) / 100;
+}
+
+interface League { league_id: string; name: string; scoring_settings?: Record<string, number> }
 interface Roster { roster_id: number; owner_id: string | null; co_owners?: string[] | null }
 interface User { user_id: string; display_name: string; metadata?: { team_name?: string } }
 interface SleeperMatchup {
@@ -62,14 +98,16 @@ interface SleeperMatchup {
 }
 
 export async function getSleeperLeagueWeek(leagueId: string, season: string, week: number): Promise<LeagueWeek> {
-  const [league, rosters, users, matchups, players, states] = await Promise.all([
+  const [league, rosters, users, matchups, players, states, projections] = await Promise.all([
     get<League>(`/league/${leagueId}`, 600),
     get<Roster[]>(`/league/${leagueId}/rosters`, 600),
     get<User[]>(`/league/${leagueId}/users`, 600),
     get<SleeperMatchup[] | null>(`/league/${leagueId}/matchups/${week}`, 30),
     getPlayers(),
     getGameStates(season, week),
+    getProjectionStats(season, week),
   ]);
+  const scoring = league.scoring_settings ?? {};
 
   const teamWeek = (m: SleeperMatchup): TeamWeek => {
     const roster = rosters.find((r) => r.roster_id === m.roster_id);
@@ -78,14 +116,19 @@ export async function getSleeperLeagueWeek(leagueId: string, season: string, wee
     const ids = [...new Set([...starters, ...(m.players ?? [])])]; // starters first, in lineup order
     const lines: PlayerLine[] = ids.map((id) => {
       const [name, pos, team] = players[id] ?? [id, "", ""];
+      const game = gameFor(states, team || undefined);
+      const points = m.players_points?.[id] ?? 0;
+      const projected = projectedPoints(projections[id], scoring);
       return {
         id,
         name,
         pos,
         nflTeam: team || undefined,
-        points: m.players_points?.[id] ?? 0,
+        points,
+        projected,
+        pace: paceOf(points, projected, game),
         starter: starters.includes(id),
-        state: stateFor(states, team || undefined),
+        state: game.state,
       };
     });
     return {

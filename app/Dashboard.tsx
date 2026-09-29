@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import type { Matchup, MatchupsResponse, Side } from "@/lib/providers/types";
 import { ProgressLine } from "./components/GameProgress";
+import Lineups from "./components/Lineups";
 
 const REFRESH_MS = 60_000;
 
@@ -27,7 +28,7 @@ function TeamRow({ side, me }: { side: Side; me?: boolean }) {
   );
 }
 
-function MatchupCard({ m }: { m: Matchup }) {
+export function MatchupCard({ m }: { m: Matchup }) {
   const status =
     !m.opponent || m.me.score === m.opponent.score ? "" : m.me.score > m.opponent.score ? "winning" : "losing";
   return (
@@ -44,6 +45,10 @@ function MatchupCard({ m }: { m: Matchup }) {
       </div>
       <TeamRow side={m.me} me />
       {m.opponent ? <TeamRow side={m.opponent} /> : <div className="team muted">Bye week</div>}
+      <Lineups
+        a={{ teamName: m.me.teamName, starters: m.me.starters ?? [] }}
+        b={m.opponent ? { teamName: m.opponent.teamName, starters: m.opponent.starters ?? [] } : null}
+      />
     </div>
   );
 }

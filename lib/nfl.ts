@@ -1,4 +1,4 @@
-import type { GameState } from "@/lib/providers/types";
+import type { GameState, Pace } from "@/lib/providers/types";
 
 // NFL game status per team, from ESPN's public scoreboard. Team abbreviations follow Sleeper's style (WAS, not WSH).
 
@@ -14,12 +14,19 @@ export const ESPN_PRO_TEAMS: Record<number, string> = {
 
 interface Scoreboard {
   events?: {
-    status?: { type?: { state?: string } };
+    status?: { clock?: number; period?: number; type?: { state?: string } };
     competitions?: { competitors?: { team?: { abbreviation?: string } }[] }[];
   }[];
 }
 
-export type GameStates = Map<string, GameState>;
+export interface TeamGame {
+  state: GameState;
+  fraction: number; // share of the game played, 0..1
+}
+
+export type GameStates = Map<string, TeamGame>;
+
+const QUARTER = 15 * 60;
 
 export async function getGameStates(season: string, week: number): Promise<GameStates> {
   const url = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${season}&seasontype=2&week=${week}`;
@@ -30,10 +37,16 @@ export async function getGameStates(season: string, week: number): Promise<GameS
     const data = (await res.json()) as Scoreboard;
     for (const e of data.events ?? []) {
       const s = e.status?.type?.state;
-      const state: GameState = s === "post" ? "done" : s === "in" ? "live" : "upcoming";
+      let game: TeamGame;
+      if (s === "post") game = { state: "done", fraction: 1 };
+      else if (s === "in") {
+        const period = e.status?.period ?? 1;
+        const played = period > 4 ? 4 * QUARTER : (period - 1) * QUARTER + (QUARTER - (e.status?.clock ?? QUARTER));
+        game = { state: "live", fraction: Math.min(1, Math.max(0, played / (4 * QUARTER))) };
+      } else game = { state: "upcoming", fraction: 0 };
       for (const c of e.competitions?.[0]?.competitors ?? []) {
         const abbr = c.team?.abbreviation;
-        if (abbr) states.set(ESPN_ABBR_FIX[abbr] ?? abbr, state);
+        if (abbr) states.set(ESPN_ABBR_FIX[abbr] ?? abbr, game);
       }
     }
   } catch {
@@ -42,7 +55,18 @@ export async function getGameStates(season: string, week: number): Promise<GameS
   return states;
 }
 
-export function stateFor(states: GameStates, team?: string): GameState {
-  if (!team) return "bye";
-  return states.get(team) ?? (states.size ? "bye" : "upcoming");
+export function gameFor(states: GameStates, team?: string): TeamGame {
+  if (!team) return { state: "bye", fraction: 0 };
+  return states.get(team) ?? (states.size ? { state: "bye", fraction: 0 } : { state: "upcoming", fraction: 0 });
+}
+
+// Is a player ahead of or behind his projection, given how much of his game has been played?
+export function paceOf(points: number, projected: number | undefined, game: TeamGame): Pace | undefined {
+  if (projected == null || projected <= 0) return undefined;
+  if (game.state !== "live" && game.state !== "done") return undefined;
+  const expected = projected * game.fraction;
+  const margin = Math.max(1, expected * 0.1);
+  if (points > expected + margin) return "over";
+  if (points < expected - margin) return "under";
+  return "even";
 }

@@ -154,7 +154,10 @@ h3.section { font-size: 0.95rem; color: var(--muted); text-transform: uppercase;
 .lineup-row { display: flex; align-items: center; gap: 4px; font-size: 0.85rem; padding: 3px 0; border-top: 1px solid var(--border); }
 .pl-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pl-name .muted { font-size: 0.75rem; }
-.pl-pts { font-variant-numeric: tabular-nums; font-weight: 600; }
+.pl-pts { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.pl-proj { color: var(--muted); font-weight: 400; font-size: 0.75em; margin-left: 4px; }
+.pace-over { color: var(--win); }
+.pace-under { color: var(--lose); }
 
 table.players { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 table.players th { text-align: left; font-size: 0.75rem; color: var(--muted); font-weight: 500; padding: 10px 12px; border-bottom: 1px solid var(--border); }

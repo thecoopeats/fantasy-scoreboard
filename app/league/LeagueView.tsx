@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { LeagueWeek, PlayerLine, TeamWeek } from "@/lib/providers/types";
-import { ProgressLine, StateDot } from "../components/GameProgress";
+import { PlayerPoints, ProgressLine, StateDot } from "../components/GameProgress";
+import Lineups from "../components/Lineups";
 
 const fmt = (n: number) => n.toFixed(2);
 
@@ -21,24 +22,7 @@ function TeamLine({ team, mine, leading }: { team: TeamWeek; mine: boolean; lead
   );
 }
 
-function Lineup({ team }: { team: TeamWeek }) {
-  const starters = team.players.filter((p) => p.starter);
-  if (!starters.length) return null;
-  return (
-    <div className="lineup">
-      <div className="lineup-title">{team.teamName}</div>
-      {starters.map((p) => (
-        <div key={p.id} className="lineup-row">
-          <StateDot state={p.state} />
-          <span className="pl-name">
-            {p.name} <span className="muted">{[p.pos, p.nflTeam].filter(Boolean).join(" · ")}</span>
-          </span>
-          <span className="pl-pts">{fmt(p.points)}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
+const lineupOf = (t: TeamWeek) => ({ teamName: t.teamName, starters: t.players.filter((p) => p.starter) });
 
 export default function LeagueView({
   platform,
@@ -102,15 +86,7 @@ export default function LeagueView({
               ) : (
                 <div className="team muted">Bye week</div>
               )}
-              {g.a.players.length > 0 && (
-                <details className="lineups">
-                  <summary>Lineups</summary>
-                  <div className="lineup-grid">
-                    <Lineup team={g.a} />
-                    {g.b && <Lineup team={g.b} />}
-                  </div>
-                </details>
-              )}
+              <Lineups a={lineupOf(g.a)} b={g.b ? lineupOf(g.b) : null} />
             </div>
           ))}
 
@@ -139,7 +115,7 @@ export default function LeagueView({
                         {!p.starter && <span className="bench">bench</span>}
                       </td>
                       <td className="muted">{p.fantasyTeam}</td>
-                      <td className="num">{fmt(p.points)}</td>
+                      <td className="num"><PlayerPoints player={p} /></td>
                     </tr>
                   ))}
                 </tbody>
