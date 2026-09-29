@@ -78,8 +78,8 @@ async function fetchLeague(
   if (creds) headers.Cookie = `espn_s2=${creds.espnS2}; SWID=${normalizeSwid(creds.swid)}`;
   if (filter) headers["X-Fantasy-Filter"] = JSON.stringify(filter);
 
-  // Private-league requests carry cookies, so never cache them.
-  const res = await fetch(url, creds ? { headers, cache: "no-store" } : { headers, next: { revalidate: 30 } });
+  // Always fresh: live scores, and private-league requests carry cookies.
+  const res = await fetch(url, { headers, cache: "no-store" });
   if (res.status === 401) {
     throw new Error(
       creds

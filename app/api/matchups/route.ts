@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getUser } from "@/lib/auth";
 import { decrypt } from "@/lib/crypto";
+import { anyLive, getGameStates } from "@/lib/nfl";
 import { getEspnMatchup } from "@/lib/providers/espn";
 import { currentWeek, getNflState, getSleeperMatchups } from "@/lib/providers/sleeper";
 import type { Matchup, MatchupsResponse } from "@/lib/providers/types";
@@ -55,9 +56,12 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  const results = await Promise.allSettled(tasks.map((t) => t.run()));
+  const [results, states] = await Promise.all([
+    Promise.allSettled(tasks.map((t) => t.run())),
+    getGameStates(season, week),
+  ]);
 
-  const body: MatchupsResponse = { season, week, matchups: [], errors: [] };
+  const body: MatchupsResponse = { season, week, live: anyLive(states), matchups: [], errors: [] };
   results.forEach((r, i) => {
     if (r.status === "fulfilled") body.matchups.push(...r.value);
     else body.errors.push({ source: tasks[i].source, message: r.reason?.message ?? "Unknown error" });

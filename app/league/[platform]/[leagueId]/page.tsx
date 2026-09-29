@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { decrypt } from "@/lib/crypto";
+import { anyLive, getGameStates, REFRESH_IDLE_SECONDS, REFRESH_LIVE_SECONDS } from "@/lib/nfl";
 import { getEspnLeagueWeek } from "@/lib/providers/espn";
 import { currentWeek, getNflState, getSleeperLeagueWeek } from "@/lib/providers/sleeper";
 import type { LeagueWeek, TeamWeek } from "@/lib/providers/types";
@@ -47,16 +48,15 @@ export default async function LeaguePage({
 
   let lw: LeagueWeek | null = null;
   let error: string | null = null;
-  try {
-    lw = await load();
-  } catch (e) {
-    error = e instanceof Error ? e.message : "Couldn't load this league.";
-  }
+  const [result, states] = await Promise.allSettled([load(), getGameStates(state.season, week)]);
+  if (result.status === "fulfilled") lw = result.value;
+  else error = result.reason instanceof Error ? result.reason.message : "Couldn't load this league.";
+  const live = states.status === "fulfilled" && anyLive(states.value);
 
   return (
     <main className="container">
       <Header email={user.email} />
-      <AutoRefresh seconds={60} />
+      <AutoRefresh seconds={live ? REFRESH_LIVE_SECONDS : REFRESH_IDLE_SECONDS} />
       <LeagueView platform={platform} leagueId={leagueId} week={week} lw={lw} error={error} isMine={isMine} />
     </main>
   );

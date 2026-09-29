@@ -1,12 +1,14 @@
 import { unstable_cache } from "next/cache";
+import { memo } from "@/lib/memo";
 import { gameFor, getGameStates, paceOf } from "@/lib/nfl";
 import { progressOf, sortPlayers, toSide, type LeagueWeek, type Matchup, type PlayerLine, type TeamWeek } from "./types";
 
 // Sleeper's public API: https://docs.sleeper.com (no auth required).
 const BASE = "https://api.sleeper.app/v1";
 
+// revalidate = 0 means always fetch fresh (used for live scores).
 async function get<T>(path: string, revalidate: number): Promise<T> {
-  const res = await fetch(BASE + path, { next: { revalidate } });
+  const res = await fetch(BASE + path, revalidate > 0 ? { next: { revalidate } } : { cache: "no-store" });
   if (!res.ok) throw new Error(`Sleeper returned ${res.status}`);
   return res.json() as Promise<T>;
 }
@@ -30,7 +32,7 @@ export function lookupSleeperUser(username: string) {
 }
 
 // The full player directory is ~15 MB, so keep a trimmed copy (id -> [name, pos, team]) cached for 12 hours.
-const getPlayers = unstable_cache(
+const getPlayers = memo(60 * 60 * 1000, unstable_cache(
   async () => {
     const res = await fetch(BASE + "/players/nfl", { cache: "no-store" });
     if (!res.ok) throw new Error(`Sleeper players returned ${res.status}`);
@@ -47,10 +49,10 @@ const getPlayers = unstable_cache(
   },
   ["sleeper-players-v1"],
   { revalidate: 43200 }
-);
+));
 
 // Projected stat lines per player (not documented by Sleeper, so failures just mean no projections).
-const getProjectionStats = unstable_cache(
+const getProjectionStats = memo(15 * 60 * 1000, unstable_cache(
   async (season: string, week: number): Promise<Record<string, Record<string, number>>> => {
     const positions = ["QB", "RB", "WR", "TE", "K", "DEF"].map((p) => `position%5B%5D=${p}`).join("&");
     try {
@@ -69,7 +71,7 @@ const getProjectionStats = unstable_cache(
   },
   ["sleeper-projections-v1"],
   { revalidate: 3600 }
-);
+));
 
 // Score a projected stat line with the league's own scoring settings.
 function projectedPoints(stats: Record<string, number> | undefined, scoring: Record<string, number>) {
@@ -102,7 +104,7 @@ export async function getSleeperLeagueWeek(leagueId: string, season: string, wee
     get<League>(`/league/${leagueId}`, 600),
     get<Roster[]>(`/league/${leagueId}/rosters`, 600),
     get<User[]>(`/league/${leagueId}/users`, 600),
-    get<SleeperMatchup[] | null>(`/league/${leagueId}/matchups/${week}`, 30),
+    get<SleeperMatchup[] | null>(`/league/${leagueId}/matchups/${week}`, 0),
     getPlayers(),
     getGameStates(season, week),
     getProjectionStats(season, week),

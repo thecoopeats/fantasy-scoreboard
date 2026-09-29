@@ -32,7 +32,7 @@ export async function getGameStates(season: string, week: number): Promise<GameS
   const url = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${season}&seasontype=2&week=${week}`;
   const states: GameStates = new Map();
   try {
-    const res = await fetch(url, { next: { revalidate: 60 } });
+    const res = await fetch(url, { next: { revalidate: 15 } });
     if (!res.ok) return states;
     const data = (await res.json()) as Scoreboard;
     for (const e of data.events ?? []) {
@@ -54,6 +54,15 @@ export async function getGameStates(season: string, week: number): Promise<GameS
   }
   return states;
 }
+
+export function anyLive(states: GameStates) {
+  for (const g of states.values()) if (g.state === "live") return true;
+  return false;
+}
+
+// How often pages poll: fast while games are on, slow otherwise (keeps usage within Vercel's free plan).
+export const REFRESH_LIVE_SECONDS = 15;
+export const REFRESH_IDLE_SECONDS = 120;
 
 export function gameFor(states: GameStates, team?: string): TeamGame {
   if (!team) return { state: "bye", fraction: 0 };

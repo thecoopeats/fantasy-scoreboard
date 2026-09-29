@@ -5,8 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { Matchup, MatchupsResponse, Side } from "@/lib/providers/types";
 import { ProgressLine } from "./components/GameProgress";
 import Lineups from "./components/Lineups";
-
-const REFRESH_MS = 60_000;
+import { REFRESH_IDLE_SECONDS, REFRESH_LIVE_SECONDS } from "@/lib/nfl";
 
 function fmt(n: number) {
   return n.toFixed(2);
@@ -79,13 +78,24 @@ export default function Dashboard({ initialWeek }: { initialWeek: number }) {
     }
   }, []);
 
+  const live = data?.week === week && data.live;
+
   useEffect(() => {
     load(week);
-    const t = setInterval(() => {
-      if (document.visibilityState === "visible") load(week, true);
-    }, REFRESH_MS);
-    return () => clearInterval(t);
   }, [week, load]);
+
+  // Poll fast while games are on, slowly otherwise; refresh right away when the tab comes back into view.
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === "visible") load(week, true);
+    };
+    const t = setInterval(refresh, (live ? REFRESH_LIVE_SECONDS : REFRESH_IDLE_SECONDS) * 1000);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [week, live, load]);
 
   const matchups = data?.week === week ? data.matchups : [];
   const winning = matchups.filter((m) => m.opponent && m.me.score > m.opponent.score).length;
@@ -100,7 +110,11 @@ export default function Dashboard({ initialWeek }: { initialWeek: number }) {
         <div className="title">
           Week {week}
           <span className="muted">
-            {loading ? "Loading…" : updated ? `Updated ${updated.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : ""}
+            {loading
+              ? "Loading…"
+              : updated
+                ? `${live ? "● Live · " : ""}Updated ${updated.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: live ? "2-digit" : undefined })}`
+                : ""}
           </span>
         </div>
         <button className="secondary" onClick={() => setWeek((w) => Math.min(18, w + 1))} disabled={week >= 18}>

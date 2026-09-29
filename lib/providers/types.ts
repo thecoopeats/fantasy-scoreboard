@@ -64,6 +64,7 @@ export interface Matchup {
 export interface MatchupsResponse {
   season: string;
   week: number;
+  live: boolean; // any NFL game in progress this week
   matchups: Matchup[];
   errors: { source: string; message: string }[];
 }
