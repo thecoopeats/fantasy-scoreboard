@@ -148,10 +148,11 @@ h3.section { font-size: 0.95rem; color: var(--muted); text-transform: uppercase;
 
 .lineups { border-top: 1px solid var(--border); padding: 0 16px 10px; }
 .lineups summary { margin-top: 10px; }
-.lineup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 8px; }
+.lineup-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; margin-top: 8px; }
 @media (max-width: 560px) { .lineup-grid { grid-template-columns: 1fr; } }
 .lineup-title { font-weight: 600; font-size: 0.85rem; margin-bottom: 4px; }
 .lineup-row { display: flex; align-items: center; gap: 4px; font-size: 0.85rem; padding: 3px 0; border-top: 1px solid var(--border); }
+.slot { width: 30px; flex-shrink: 0; font-size: 0.65rem; font-weight: 700; color: var(--muted); letter-spacing: 0.02em; }
 .pl-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pl-name .muted { font-size: 0.75rem; }
 .pl-pts { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }

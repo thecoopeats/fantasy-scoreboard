@@ -51,6 +51,11 @@ interface LeagueData {
 
 const POSITIONS: Record<number, string> = { 1: "QB", 2: "RB", 3: "WR", 4: "TE", 5: "K", 16: "DEF" };
 const BENCH_SLOTS = new Set([20, 21]); // bench, IR
+// ESPN lineupSlotId -> Sleeper-style slot name
+const SLOTS: Record<number, string> = {
+  0: "QB", 2: "RB", 3: "WRRB_FLEX", 4: "WR", 5: "REC_FLEX", 6: "TE", 7: "SUPER_FLEX", 16: "DEF", 17: "K", 23: "FLEX",
+  8: "DT", 9: "DE", 10: "LB", 11: "DL", 12: "CB", 13: "S", 14: "DB", 15: "IDP_FLEX",
+};
 
 export function normalizeSwid(swid: string) {
   const s = swid.trim();
@@ -150,6 +155,7 @@ export async function getEspnLeagueWeek(
         projected,
         pace: paceOf(points, projected, game),
         starter: !BENCH_SLOTS.has(e.lineupSlotId ?? 20),
+        slot: SLOTS[e.lineupSlotId ?? -1],
         state: game.state,
       };
     });

@@ -1,4 +1,4 @@
-import type { PlayerLine } from "@/lib/providers/types";
+import { slotLabel, type PlayerLine } from "@/lib/providers/types";
 import { PlayerPoints, StateDot } from "./GameProgress";
 
 interface LineupTeam {
@@ -13,6 +13,7 @@ function Lineup({ team }: { team: LineupTeam }) {
       <div className="lineup-title">{team.teamName}</div>
       {team.starters.map((p) => (
         <div key={p.id} className="lineup-row">
+          <span className="slot">{slotLabel(p.slot)}</span>
           <StateDot state={p.state} />
           <span className="pl-name">
             {p.name} <span className="muted">{[p.pos, p.nflTeam].filter(Boolean).join(" · ")}</span>

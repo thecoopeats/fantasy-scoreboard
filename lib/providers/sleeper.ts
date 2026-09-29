@@ -87,7 +87,12 @@ function projectedPoints(stats: Record<string, number> | undefined, scoring: Rec
   return Math.round(total * 100) / 100;
 }
 
-interface League { league_id: string; name: string; scoring_settings?: Record<string, number> }
+interface League {
+  league_id: string;
+  name: string;
+  scoring_settings?: Record<string, number>;
+  roster_positions?: string[];
+}
 interface Roster { roster_id: number; owner_id: string | null; co_owners?: string[] | null }
 interface User { user_id: string; display_name: string; metadata?: { team_name?: string } }
 interface SleeperMatchup {
@@ -114,6 +119,12 @@ export async function getSleeperLeagueWeek(leagueId: string, season: string, wee
   const teamWeek = (m: SleeperMatchup): TeamWeek => {
     const roster = rosters.find((r) => r.roster_id === m.roster_id);
     const user = users.find((u) => u.user_id === roster?.owner_id);
+    // starters[i] fills the league's roster_positions[i]; "0" marks an empty slot.
+    const slotOf = new Map<string, string>();
+    (m.starters ?? []).forEach((id, i) => {
+      const slot = league.roster_positions?.[i];
+      if (id && id !== "0" && slot) slotOf.set(id, slot);
+    });
     const starters = (m.starters ?? []).filter((id) => id && id !== "0");
     const ids = [...new Set([...starters, ...(m.players ?? [])])]; // starters first, in lineup order
     const lines: PlayerLine[] = ids.map((id) => {
@@ -130,6 +141,7 @@ export async function getSleeperLeagueWeek(leagueId: string, season: string, wee
         projected,
         pace: paceOf(points, projected, game),
         starter: starters.includes(id),
+        slot: slotOf.get(id),
         state: game.state,
       };
     });

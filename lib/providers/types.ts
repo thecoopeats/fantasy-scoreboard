@@ -15,7 +15,28 @@ export interface PlayerLine {
   projected?: number;
   pace?: Pace;
   starter: boolean;
+  slot?: string; // lineup slot for starters, Sleeper-style: QB, RB, WR, TE, FLEX, SUPER_FLEX, K, DEF…
   state: GameState;
+}
+
+// Lineup display order. Anything not listed (e.g. IDP slots) goes after DEF.
+const SLOT_ORDER = ["QB", "RB", "WR", "TE", "FLEX", "WRRB_FLEX", "REC_FLEX", "SUPER_FLEX", "K", "DEF"];
+
+const SLOT_LABELS: Record<string, string> = {
+  FLEX: "FLEX",
+  WRRB_FLEX: "FLEX",
+  REC_FLEX: "FLEX",
+  SUPER_FLEX: "SFLX",
+  IDP_FLEX: "IDP",
+};
+
+export function slotLabel(slot?: string) {
+  return slot ? (SLOT_LABELS[slot] ?? slot) : "";
+}
+
+function slotRank(slot?: string) {
+  const i = slot ? SLOT_ORDER.indexOf(slot) : -1;
+  return i === -1 ? SLOT_ORDER.length : i;
 }
 
 // Starters only.
@@ -91,9 +112,9 @@ export function toSide(t: TeamWeek): Side {
   };
 }
 
-// Starters in lineup order, then bench by points.
+// Starters as QB, RB, WR, TE, FLEX, K, DEF, then bench by points.
 export function sortPlayers(players: PlayerLine[]): PlayerLine[] {
-  const starters = players.filter((p) => p.starter);
+  const starters = players.filter((p) => p.starter).sort((a, b) => slotRank(a.slot) - slotRank(b.slot));
   const bench = players.filter((p) => !p.starter).sort((a, b) => b.points - a.points);
   return [...starters, ...bench];
 }
