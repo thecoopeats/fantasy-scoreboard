@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import type { Matchup, MatchupsResponse, Side } from "@/lib/providers/types";
+import { ProgressLine } from "./components/GameProgress";
 
 const REFRESH_MS = 60_000;
 
@@ -15,6 +17,7 @@ function TeamRow({ side, me }: { side: Side; me?: boolean }) {
       <div className="name">
         {side.teamName}
         {side.ownerName && side.ownerName !== side.teamName && <span className="owner">{side.ownerName}</span>}
+        <ProgressLine progress={side.progress} />
       </div>
       <div className="score">
         {fmt(side.score)}
@@ -34,7 +37,10 @@ function MatchupCard({ m }: { m: Matchup }) {
           <span className={`badge ${m.platform}`}>{m.platform}</span>
           {m.leagueName}
         </div>
-        <a href={m.url} target="_blank" rel="noreferrer">Open ↗</a>
+        <div className="links">
+          {m.leagueHref && <Link href={m.leagueHref}>All matchups &amp; top players ›</Link>}
+          <a href={m.url} target="_blank" rel="noreferrer">Open ↗</a>
+        </div>
       </div>
       <TeamRow side={m.me} me />
       {m.opponent ? <TeamRow side={m.opponent} /> : <div className="team muted">Bye week</div>}

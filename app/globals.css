@@ -119,3 +119,48 @@ code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font-si
 .matchup.losing .team.me .score { color: var(--lose); }
 
 .empty { text-align: center; padding: 32px 16px; }
+
+.matchup .head .links { display: flex; gap: 14px; flex-shrink: 0; }
+.matchup .head .links a:first-child { color: var(--accent); }
+
+/* Starters: done / playing / left */
+.progress { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 3px; font-size: 0.75rem; font-weight: 500; }
+.p-done { color: var(--muted); }
+.p-live { color: var(--win); }
+.p-up { color: #fbbf24; }
+
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin: 0 4px 1px 0; vertical-align: middle; }
+.dot.done { background: var(--muted); }
+.dot.live { background: var(--win); box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.25); }
+.dot.upcoming { background: #fbbf24; }
+.dot.bye { background: transparent; border: 1px solid var(--muted); }
+
+/* League page */
+.back { color: var(--muted); text-decoration: none; font-size: 0.9rem; }
+.back:hover { color: var(--text); }
+.league-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.league-title a { text-decoration: none; }
+h3.section { font-size: 0.95rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin: 24px 0 10px; }
+.weekbar .button { margin: 0; padding: 6px 12px; }
+.team.leading .score { color: var(--win); }
+.matchup.my-game { border-color: var(--accent); }
+.you { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; background: var(--accent); color: white; border-radius: 4px; padding: 1px 5px; margin-left: 6px; vertical-align: middle; }
+
+.lineups { border-top: 1px solid var(--border); padding: 0 16px 10px; }
+.lineups summary { margin-top: 10px; }
+.lineup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 8px; }
+@media (max-width: 560px) { .lineup-grid { grid-template-columns: 1fr; } }
+.lineup-title { font-weight: 600; font-size: 0.85rem; margin-bottom: 4px; }
+.lineup-row { display: flex; align-items: center; gap: 4px; font-size: 0.85rem; padding: 3px 0; border-top: 1px solid var(--border); }
+.pl-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-name .muted { font-size: 0.75rem; }
+.pl-pts { font-variant-numeric: tabular-nums; font-weight: 600; }
+
+table.players { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+table.players th { text-align: left; font-size: 0.75rem; color: var(--muted); font-weight: 500; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+table.players td { padding: 8px 12px; border-top: 1px solid var(--border); }
+table.players td .muted { font-size: 0.75rem; }
+table.players .num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.bench { font-size: 0.65rem; text-transform: uppercase; color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; margin-left: 6px; }
+@media (max-width: 560px) { table.players th:nth-child(3), table.players td:nth-child(3) { display: none; } }
+.legend { font-size: 0.8rem; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
