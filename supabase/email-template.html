@@ -1,0 +1,54 @@
+<!-- Supabase: Authentication -> Emails -> Templates. Paste into BOTH "Magic Link" and "Confirm signup".
+     Subject: Your Fantasy Scoreboard sign-in link -->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0b1220" style="background-color:#0b1220;padding:32px 16px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <tr>
+    <td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:440px;">
+        <tr>
+          <td style="padding:0 4px 16px;font-size:22px;font-weight:700;color:#e8edf7;">
+            &#127944; Fantasy Scoreboard
+          </td>
+        </tr>
+        <tr>
+          <td bgcolor="#131c2e" style="background-color:#131c2e;border:1px solid #243150;border-radius:12px;padding:28px 24px;">
+            <p style="margin:0 0 8px;font-size:18px;font-weight:700;color:#e8edf7;">Sign in to your scoreboard</p>
+            <p style="margin:0 0 24px;font-size:15px;line-height:1.5;color:#8b98b3;">
+              Tap the button below to sign in. Your Sleeper, ESPN and Yahoo matchups will be waiting.
+            </p>
+
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+              <tr>
+                <td align="center" bgcolor="#3b82f6" style="background-color:#3b82f6;border-radius:8px;">
+                  <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email"
+                     style="display:block;padding:14px 20px;font-size:16px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:8px;">
+                    Sign in
+                  </a>
+                </td>
+              </tr>
+            </table>
+
+            <p style="margin:28px 0 8px;font-size:13px;color:#8b98b3;text-align:center;">
+              Or enter this code on the sign-in page:
+            </p>
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+              <tr>
+                <td align="center" bgcolor="#1a2540" style="background-color:#1a2540;border:1px solid #243150;border-radius:8px;padding:14px;font-family:'SF Mono',Consolas,Menlo,monospace;font-size:28px;font-weight:700;letter-spacing:6px;color:#22c55e;">
+                  {{ .Token }}
+                </td>
+              </tr>
+            </table>
+
+            <p style="margin:24px 0 0;font-size:12px;line-height:1.5;color:#8b98b3;text-align:center;">
+              The link and code expire soon and work once. Didn't ask to sign in? You can ignore this email.
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:16px 4px 0;font-size:12px;color:#5b6883;text-align:center;">
+            <a href="{{ .SiteURL }}" style="color:#5b6883;text-decoration:underline;">{{ .SiteURL }}</a>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
