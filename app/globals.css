@@ -76,6 +76,7 @@ button:disabled { opacity: 0.6; cursor: default; }
 button.secondary { background: var(--panel-2); border: 1px solid var(--border); color: var(--text); }
 button.link { background: none; padding: 0; margin: 0; color: var(--muted); font-weight: 400; }
 button.link:hover { color: var(--text); }
+button.link-inline { background: none; padding: 0; margin: 0; color: var(--accent); font-weight: 500; font-size: inherit; text-decoration: underline; }
 button.danger { background: none; color: #fca5a5; padding: 4px 8px; margin: 0; font-weight: 500; }
 
 details summary { cursor: pointer; color: var(--muted); font-size: 0.9rem; margin-top: 12px; }
