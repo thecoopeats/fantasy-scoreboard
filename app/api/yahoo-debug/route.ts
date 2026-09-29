@@ -21,11 +21,12 @@ export async function GET(request: NextRequest) {
   const { data: yahoo } = await supabase.from("yahoo_accounts").select("*").maybeSingle();
   if (!yahoo) return NextResponse.json({ config, error: "No Yahoo account connected." });
 
+  const connection = { connectedAt: yahoo.created_at, accessExpiresAt: yahoo.expires_at, now: new Date().toISOString() };
   try {
     const token = await yahooAccessToken(supabase, yahoo);
     const state = await getNflState();
-    return NextResponse.json({ config, connectedAt: yahoo.created_at, ...(await debugYahoo(token, currentWeek(state))) });
+    return NextResponse.json({ config, connection, ...(await debugYahoo(token, currentWeek(state))) });
   } catch (e) {
-    return NextResponse.json({ config, error: e instanceof Error ? e.message : String(e) });
+    return NextResponse.json({ config, connection, error: e instanceof Error ? e.message : String(e) });
   }
 }
