@@ -3,8 +3,9 @@ import { NextResponse, type NextRequest } from "next/server";
 
 // Keeps the login session fresh and sends signed-out visitors to /login.
 export async function middleware(request: NextRequest) {
-  // If Supabase sent the sign-in link to the Site URL instead of /auth/confirm, forward it.
-  if (request.nextUrl.searchParams.has("code") && request.nextUrl.pathname !== "/auth/confirm") {
+  // If Supabase sent the sign-in link to the Site URL (the home page) instead of /auth/confirm, forward it.
+  // Only the home page: other routes, like the Yahoo callback, use ?code= for their own purposes.
+  if (request.nextUrl.searchParams.has("code") && request.nextUrl.pathname === "/") {
     const url = request.nextUrl.clone();
     url.pathname = "/auth/confirm";
     return NextResponse.redirect(url);
