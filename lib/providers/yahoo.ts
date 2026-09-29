@@ -169,3 +169,33 @@ export async function getYahooMatchups(token: string, week: number): Promise<Mat
 
   return results.filter((m): m is Matchup => m !== null);
 }
+
+// TEMPORARY: what Yahoo returns vs. what the parser finds. Remove once Yahoo works.
+export async function debugYahoo(token: string, week: number) {
+  const clip = (x: Json) => JSON.stringify(x).slice(0, 4000);
+  const out: Record<string, Json> = { week };
+  try {
+    const teamsJson = await yget(token, "/users;use_login=1/games;game_keys=nfl/teams");
+    out.teamsRaw = clip(teamsJson);
+    const game = nflGame(teamsJson);
+    out.gameKeys = Object.keys(game);
+    const myTeams = items(game.teams, "team").map(merge);
+    out.parsedTeams = myTeams.map((t) => ({ team_key: t.team_key, name: t.name }));
+
+    const leaguesJson = await yget(token, "/users;use_login=1/games;game_keys=nfl/leagues");
+    out.leaguesRaw = clip(leaguesJson);
+    out.parsedLeagues = items(nflGame(leaguesJson).leagues, "league").map(merge).map((l) => ({ key: l.league_key, name: l.name }));
+
+    const firstKey = myTeams[0]?.team_key ?? JSON.stringify(teamsJson).match(/"team_key":"([^"]+)"/)?.[1];
+    if (firstKey) {
+      const mJson = await yget(token, `/team/${firstKey}/matchups;weeks=${week}`);
+      out.matchupRaw = clip(mJson);
+      const matchup = items(merge(mJson?.fantasy_content?.team).matchups, "matchup")[0];
+      out.matchupFound = !!matchup;
+      out.matchupKeys = matchup ? Object.keys(matchup) : null;
+    }
+  } catch (e) {
+    out.error = e instanceof Error ? e.message : String(e);
+  }
+  return out;
+}
