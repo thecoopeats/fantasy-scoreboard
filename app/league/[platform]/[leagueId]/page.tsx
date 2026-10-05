@@ -32,7 +32,7 @@ export default async function LeaguePage({
   if (platform === "sleeper") {
     const { data: acct } = await supabase.from("sleeper_accounts").select("sleeper_user_id").maybeSingle();
     if (!acct) notFound();
-    load = () => getSleeperLeagueWeek(leagueId, state.season, week);
+    load = () => getSleeperLeagueWeek(leagueId, state.season, week, { freeAgents: true });
     isMine = (t) => t.ownerIds.includes(acct.sleeper_user_id);
   } else if (platform === "espn") {
     const { data: row } = await supabase
@@ -42,7 +42,7 @@ export default async function LeaguePage({
       .maybeSingle();
     if (!row) notFound();
     const creds = row.espn_s2 && row.swid ? { espnS2: decrypt(row.espn_s2), swid: decrypt(row.swid) } : undefined;
-    load = () => getEspnLeagueWeek({ leagueId, leagueName: row.league_name, creds }, state.season, week);
+    load = () => getEspnLeagueWeek({ leagueId, leagueName: row.league_name, creds, freeAgents: true }, state.season, week);
     isMine = (t) => row.team_id != null && t.key === String(row.team_id);
   } else if (platform === "yahoo") {
     const { data: yahoo } = await supabase.from("yahoo_accounts").select("*").maybeSingle();

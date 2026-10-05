@@ -153,13 +153,26 @@ async function getMyYahooTeams(token: string) {
   return { teamKeys: new Set(teamKeys), leagues };
 }
 
-async function getRosterPlayers(
-  token: string,
-  teamKey: string,
-  week: number,
-  states: Awaited<ReturnType<typeof getGameStates>>
-): Promise<PlayerLine[]> {
+type GameStates = Awaited<ReturnType<typeof getGameStates>>;
+
+async function getRosterPlayers(token: string, teamKey: string, week: number, states: GameStates) {
   const json = await yget(token, `/team/${teamKey}/roster;week=${week}/players/stats;type=week;week=${week}`);
+  return parsePlayers(json, states);
+}
+
+// Available players (free agents + waivers) with the most points this week.
+async function getAvailablePlayers(token: string, leagueKey: string, week: number, states: GameStates) {
+  const json = await yget(
+    token,
+    `/league/${leagueKey}/players;status=A;sort=PTS;sort_type=week;sort_week=${week};count=25/stats;type=week;week=${week}`
+  );
+  return parsePlayers(json, states)
+    .map((p) => ({ ...p, starter: false, slot: undefined }))
+    .filter((p) => p.points > 0)
+    .sort((a, b) => b.points - a.points);
+}
+
+function parsePlayers(json: Json, states: GameStates): PlayerLine[] {
   return findAll(json, "player").map((raw, i) => {
     const p = merge(raw);
     const slotRaw = String(merge(p.selected_position).position ?? "BN");
@@ -218,9 +231,11 @@ export async function getYahooLeagueWeek(
   for (const teams of matchups) {
     if (rosters === "all" || teams.some((t) => mine.teamKeys.has(t.team_key))) teams.forEach((t) => wanted.add(t.team_key));
   }
-  const rosterEntries = await Promise.all(
-    [...wanted].map(async (k) => [k, await getRosterPlayers(token, k, week, states).catch(() => [])] as const)
-  );
+  const [rosterEntries, freeAgents] = await Promise.all([
+    Promise.all([...wanted].map(async (k) => [k, await getRosterPlayers(token, k, week, states).catch(() => [])] as const)),
+    // The league page (all rosters) also lists the best available players.
+    rosters === "all" ? getAvailablePlayers(token, leagueKey, week, states).catch(() => undefined) : undefined,
+  ]);
   const rosterByTeam = new Map(rosterEntries);
 
   const teamWeek = (t: YahooTeam): TeamWeek => {
@@ -249,6 +264,7 @@ export async function getYahooLeagueWeek(
     week,
     url: String(leagueMeta.url ?? "https://football.fantasysports.yahoo.com/"),
     games: matchups.filter((ts) => ts.length).map((ts) => ({ a: teamWeek(ts[0]), b: ts[1] ? teamWeek(ts[1]) : null })),
+    freeAgents,
     myTeamKeys: mine.teamKeys,
   };
 }

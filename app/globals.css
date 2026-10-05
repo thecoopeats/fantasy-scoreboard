@@ -170,4 +170,6 @@ table.players td .muted { font-size: 0.75rem; }
 table.players .num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
 .bench { font-size: 0.65rem; text-transform: uppercase; color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; margin-left: 6px; }
 @media (max-width: 560px) { table.players th:nth-child(3), table.players td:nth-child(3) { display: none; } }
+details.available { margin-top: 16px; }
+details.available > summary { font-size: 0.95rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
 .legend { font-size: 0.8rem; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }

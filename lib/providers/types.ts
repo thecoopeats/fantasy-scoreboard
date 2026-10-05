@@ -85,6 +85,7 @@ export interface LeagueWeek {
   week: number;
   url: string;
   games: { a: TeamWeek; b: TeamWeek | null }[];
+  freeAgents?: PlayerLine[]; // top-scoring players not on any team, when requested
 }
 
 export interface Matchup {

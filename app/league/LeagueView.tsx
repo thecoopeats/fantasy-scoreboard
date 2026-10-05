@@ -122,6 +122,42 @@ export default function LeagueView({
               </table>
             </div>
           )}
+
+          {lw.freeAgents && (
+            <details className="available">
+              <summary>Top available players · Week {week}</summary>
+              <p className="muted" style={{ margin: "4px 0 10px" }}>Players not on any team in this league.</p>
+              {lw.freeAgents.length === 0 ? (
+                <div className="card empty muted">No points from available players yet.</div>
+              ) : (
+                <div className="card" style={{ padding: 0 }}>
+                  <table className="players">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Player</th>
+                        <th className="num">Pts</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lw.freeAgents.slice(0, 20).map((p, i) => (
+                        <tr key={`${p.id}-${i}`}>
+                          <td className="muted">{i + 1}</td>
+                          <td>
+                            <StateDot state={p.state} />
+                            {p.name}
+                            <span className="muted"> {[p.pos, p.nflTeam].filter(Boolean).join(" · ")}</span>
+                          </td>
+                          <td className="num"><PlayerPoints player={p} /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </details>
+          )}
+
           <p className="muted legend">
             <span><StateDot state="done" />final</span>
             <span><StateDot state="live" />playing now</span>

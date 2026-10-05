@@ -51,11 +51,13 @@ interface ScheduleSide {
   rosterForCurrentScoringPeriod?: { entries?: RosterEntry[] };
 }
 interface Game { id: number; matchupPeriodId: number; home?: ScheduleSide; away?: ScheduleSide }
+type EspnPlayer = NonNullable<NonNullable<RosterEntry["playerPoolEntry"]>["player"]>;
 interface LeagueData {
   settings?: { name?: string };
   teams?: Team[];
   members?: Member[];
   schedule?: Game[];
+  players?: { id?: number; onTeamId?: number; player?: EspnPlayer }[]; // kona_player_info view
 }
 
 const POSITIONS: Record<number, string> = { 1: "QB", 2: "RB", 3: "WR", 4: "TE", 5: "K", 16: "DEF" };
@@ -130,12 +132,25 @@ export async function getEspnLeagueInfo(leagueId: string, season: string, creds?
   };
 }
 
+// Free agents and waiver players: the 200 most-owned, with this week's points (the best scorers are
+// almost always among them). Same request espn.com's player list uses.
+async function getEspnFreeAgents(leagueId: string, season: string, week: number, creds?: EspnCreds) {
+  const data = await fetchLeague(leagueId, season, ["kona_player_info"], creds, `&scoringPeriodId=${week}`, {
+    players: {
+      filterStatus: { value: ["FREEAGENT", "WAIVERS"] },
+      limit: 200,
+      sortPercOwned: { sortPriority: 1, sortAsc: false },
+    },
+  });
+  return (data.players ?? []).filter((p) => !p.onTeamId);
+}
+
 export async function getEspnLeagueWeek(
-  opts: { leagueId: string; leagueName?: string | null; creds?: EspnCreds },
+  opts: { leagueId: string; leagueName?: string | null; creds?: EspnCreds; freeAgents?: boolean },
   season: string,
   week: number
 ): Promise<LeagueWeek> {
-  const [data, states] = await Promise.all([
+  const [data, states, faRaw] = await Promise.all([
     fetchLeague(
       opts.leagueId,
       season,
@@ -145,7 +160,36 @@ export async function getEspnLeagueWeek(
       { schedule: { filterMatchupPeriodIds: { value: [week] } } }
     ),
     getGameStates(season, week),
+    opts.freeAgents ? getEspnFreeAgents(opts.leagueId, season, week, opts.creds).catch(() => []) : Promise.resolve([]),
   ]);
+
+  const freeAgents: PlayerLine[] | undefined = opts.freeAgents
+    ? faRaw
+        .map((fa, i): PlayerLine => {
+          const p = fa.player;
+          const nflTeam = p?.proTeamId ? ESPN_PRO_TEAMS[p.proTeamId] : undefined;
+          const game = gameFor(states, nflTeam);
+          const stat = (source: number) =>
+            p?.stats?.find((s) => s.statSourceId === source && s.scoringPeriodId === week)?.appliedTotal;
+          const points = stat(0) ?? 0;
+          const projected = stat(1);
+          return {
+            id: String(fa.id ?? p?.id ?? `fa-${i}`),
+            name: p?.fullName ?? "Unknown player",
+            pos: POSITIONS[p?.defaultPositionId ?? 0] ?? "",
+            nflTeam,
+            points,
+            projected,
+            pace: paceOf(points, projected, game),
+            starter: false,
+            state: game.state,
+            fraction: game.fraction,
+          };
+        })
+        .filter((p) => p.points > 0)
+        .sort((a, b) => b.points - a.points)
+        .slice(0, 25)
+    : undefined;
 
   const teamWeek = (s: ScheduleSide): TeamWeek => {
     const t = data.teams?.find((t) => t.id === s.teamId);
@@ -197,6 +241,7 @@ export async function getEspnLeagueWeek(
     week,
     url: `https://fantasy.espn.com/football/league/scoreboard?leagueId=${opts.leagueId}&seasonId=${season}&matchupPeriodId=${week}`,
     games,
+    freeAgents,
   };
 }
 
