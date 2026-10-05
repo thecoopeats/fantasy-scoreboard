@@ -208,11 +208,6 @@ export default function EspnAddWizard() {
             </div>
           )}
 
-          <div className="callout">
-            💡 <b>Easier option:</b> ask your league manager to turn on <b>League → Settings → Basic Settings → Make
-            League Viewable to Public</b>. Then just paste the link again, with no extra steps.
-          </div>
-
           <div className="step-title"><span className="step-num">2</span>Open ESPN and find your login values</div>
           <ol className="steps">
             <li>
