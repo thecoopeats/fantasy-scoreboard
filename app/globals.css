@@ -170,6 +170,27 @@ table.players td .muted { font-size: 0.75rem; }
 table.players .num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
 .bench { font-size: 0.65rem; text-transform: uppercase; color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; margin-left: 6px; }
 @media (max-width: 560px) { table.players th:nth-child(3), table.players td:nth-child(3) { display: none; } }
+/* ESPN add-league wizard */
+.wizard { border-top: 1px solid var(--border); padding-top: 14px; }
+.step-title { display: flex; align-items: center; gap: 8px; font-weight: 600; margin: 14px 0 6px; }
+.wizard > .step-title:first-of-type { margin-top: 0; }
+.step-num { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: white; font-size: 0.8rem; font-weight: 700; flex-shrink: 0; }
+.step-num.ok { background: var(--win); }
+.hint { color: var(--muted); font-size: 0.85rem; margin: 4px 0 8px; }
+.callout { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 0.85rem; margin: 10px 0; }
+.callout.warn { border-color: #854d0e; background: #2a1f0a; color: #fde68a; }
+ol.steps { margin: 6px 0; padding-left: 22px; font-size: 0.9rem; line-height: 1.6; }
+ol.steps li { margin-bottom: 4px; }
+kbd { background: var(--panel-2); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; font-size: 0.8em; font-family: inherit; }
+.tabs { display: flex; gap: 6px; margin: 10px 0 4px; flex-wrap: wrap; }
+.tab { margin: 0; padding: 6px 12px; background: var(--panel-2); border: 1px solid var(--border); color: var(--muted); font-weight: 500; font-size: 0.85rem; }
+.tab.active { background: var(--accent); border-color: var(--accent); color: white; }
+.check { font-size: 0.75rem; font-weight: 600; margin-left: 6px; }
+.check.ok { color: var(--win); }
+.check.bad { color: #fbbf24; font-weight: 500; }
+.wizard-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.wizard select { margin-bottom: 4px; }
+
 details.available { margin-top: 16px; }
 details.available > summary { font-size: 0.95rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
 .legend { font-size: 0.8rem; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }

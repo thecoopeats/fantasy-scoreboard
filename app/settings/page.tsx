@@ -4,8 +4,8 @@ import { getEspnLeagueInfo } from "@/lib/providers/espn";
 import { getNflState } from "@/lib/providers/sleeper";
 import { yahooConfigured } from "@/lib/providers/yahoo";
 import Header from "../Header";
+import EspnAddWizard from "./EspnAddWizard";
 import {
-  addEspnLeague,
   connectYahooCode,
   removeEspnLeague,
   removeSleeper,
@@ -110,24 +110,9 @@ export default async function SettingsPage({
           </div>
         ))}
 
-        <form action={addEspnLeague} style={{ marginTop: espn?.length ? 16 : 0 }}>
-          <label htmlFor="league">League ID or league URL</label>
-          <input id="league" name="league" required placeholder="e.g. 12345678 or https://fantasy.espn.com/football/league?leagueId=…" />
-          <details>
-            <summary>Private league? Add your ESPN cookies</summary>
-            <ol>
-              <li>On a computer, sign in at <a href="https://fantasy.espn.com" target="_blank" rel="noreferrer">fantasy.espn.com</a>.</li>
-              <li>Press <code>F12</code> to open developer tools, then go to <b>Application</b> (Chrome/Edge) or <b>Storage</b> (Firefox) → <b>Cookies</b> → <code>https://fantasy.espn.com</code>.</li>
-              <li>Copy the values of <code>espn_s2</code> and <code>SWID</code> into the boxes below.</li>
-            </ol>
-            <p className="muted">These are stored encrypted and only used to read your league. They act like your ESPN login, so only paste them here if you trust this site.</p>
-            <label htmlFor="espn_s2">espn_s2</label>
-            <input id="espn_s2" name="espn_s2" autoComplete="off" />
-            <label htmlFor="swid">SWID</label>
-            <input id="swid" name="swid" autoComplete="off" placeholder="{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}" />
-          </details>
-          <button type="submit">Add ESPN league</button>
-        </form>
+        <div style={{ marginTop: espn?.length ? 16 : 0 }}>
+          <EspnAddWizard />
+        </div>
       </section>
 
       <section className="card">

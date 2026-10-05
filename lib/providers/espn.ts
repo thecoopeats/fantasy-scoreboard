@@ -68,9 +68,22 @@ const SLOTS: Record<number, string> = {
   8: "DT", 9: "DE", 10: "LB", 11: "DL", 12: "CB", 13: "S", 14: "DB", 15: "IDP_FLEX",
 };
 
+// ESPN said no: either the league is private (needsCreds) or the cookies given were rejected.
+export class EspnAccessError extends Error {
+  constructor(message: string, public needsCreds: boolean) {
+    super(message);
+  }
+}
+
 export function normalizeSwid(swid: string) {
-  const s = swid.trim();
-  return s.startsWith("{") ? s : `{${s}}`;
+  const s = swid.trim().replace(/^["']|["']$/g, "");
+  return s.startsWith("{") ? s.toUpperCase() : `{${s.toUpperCase()}}`;
+}
+
+// espn_s2 must be sent URL-encoded, as the browser stores it. Browsers can show it decoded.
+export function normalizeEspnS2(s2: string) {
+  const s = s2.trim().replace(/^["']|["']$/g, "");
+  return /[+/=]/.test(s) && !s.includes("%") ? encodeURIComponent(s) : s;
 }
 
 export function parseLeagueId(input: string): string | null {
@@ -97,10 +110,11 @@ async function fetchLeague(
   // Always fresh: live scores, and private-league requests carry cookies.
   const res = await fetch(url, { headers, cache: "no-store" });
   if (res.status === 401) {
-    throw new Error(
+    throw new EspnAccessError(
       creds
         ? "ESPN rejected your cookies. They may have expired. Re-add the league with fresh espn_s2 and SWID values."
-        : "This ESPN league is private. Add your espn_s2 and SWID cookies to connect it."
+        : "This ESPN league is private. Add your espn_s2 and SWID cookies to connect it.",
+      !creds
     );
   }
   if (res.status === 404) throw new Error(`ESPN league ${leagueId} wasn't found for the ${season} season.`);

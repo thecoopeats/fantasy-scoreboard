@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
-import { decrypt, encrypt } from "@/lib/crypto";
-import { getEspnLeagueInfo, normalizeSwid, parseLeagueId, type EspnCreds } from "@/lib/providers/espn";
+import { decrypt } from "@/lib/crypto";
+import { getEspnLeagueInfo } from "@/lib/providers/espn";
 import { getNflState, lookupSleeperUser } from "@/lib/providers/sleeper";
 import { exchangeYahooCode, parseYahooCode, yahooRedirectUri } from "@/lib/providers/yahoo";
 import { saveYahooTokens } from "@/lib/yahooAccount";
@@ -46,40 +46,6 @@ export async function removeSleeper() {
   const { supabase, user } = await requireUser();
   await supabase.from("sleeper_accounts").delete().eq("user_id", user.id);
   back({ ok: "Removed your Sleeper account." });
-}
-
-export async function addEspnLeague(formData: FormData) {
-  const { supabase, user } = await requireUser();
-  const leagueId = parseLeagueId(String(formData.get("league") ?? ""));
-  const espnS2 = String(formData.get("espn_s2") ?? "").trim();
-  const swid = String(formData.get("swid") ?? "").trim();
-
-  if (!leagueId) back({ error: "Enter an ESPN league ID or paste your league's URL." });
-  if (!!espnS2 !== !!swid) back({ error: "For private leagues, fill in both espn_s2 and SWID." });
-
-  const creds: EspnCreds | undefined = espnS2 ? { espnS2, swid: normalizeSwid(swid) } : undefined;
-  const [state, stateErr] = await attempt(() => getNflState());
-  if (stateErr !== null) back({ error: stateErr });
-  const [info, err] = await attempt(() => getEspnLeagueInfo(leagueId, state.season, creds));
-  if (err !== null) back({ error: err });
-
-  // With cookies we can tell which team is theirs; otherwise they pick it next.
-  const mine = creds ? info.teams.find((t) => t.owners.includes(creds.swid.toUpperCase())) : undefined;
-
-  const { error } = await supabase.from("espn_leagues").upsert(
-    {
-      user_id: user.id,
-      league_id: leagueId,
-      league_name: info.name,
-      team_id: mine?.id ?? null,
-      team_name: mine?.name ?? null,
-      espn_s2: creds ? encrypt(creds.espnS2) : null,
-      swid: creds ? encrypt(creds.swid) : null,
-    },
-    { onConflict: "user_id,league_id" }
-  );
-  if (error) back({ error: error.message });
-  back({ ok: mine ? `Added ${info.name} (${mine.name}).` : `Added ${info.name}. Now pick which team is yours.` });
 }
 
 export async function setEspnTeam(formData: FormData) {
