@@ -1,4 +1,5 @@
-import type { Matchup } from "./types";
+import { gameFor, getGameStates, paceOf } from "@/lib/nfl";
+import { liveProjection, progressOf, sortPlayers, toSide, type LeagueWeek, type Matchup, type PlayerLine, type TeamWeek } from "./types";
 
 // Yahoo Fantasy Sports API (official, OAuth 2.0):
 // https://developer.yahoo.com/fantasysports/guide/
@@ -73,10 +74,11 @@ export class YahooAuthError extends Error {}
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Json = any;
 
-async function yget(token: string, path: string): Promise<Json> {
-  const res = await fetch(`${API}${path}?format=json`, {
+// revalidate > 0 caches per access token (the Authorization header is part of the cache key).
+async function yget(token: string, path: string, revalidate = 0): Promise<Json> {
+  const res = await fetch(`${API}${path}${path.includes("?") ? "&" : "?"}format=json`, {
     headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-    cache: "no-store",
+    ...(revalidate > 0 ? { next: { revalidate } } : { cache: "no-store" as const }),
   });
   if (res.status === 401) throw new YahooAuthError("Yahoo access expired. Reconnect Yahoo on the My leagues page.");
   if (!res.ok) {
@@ -100,99 +102,212 @@ function merge(x: Json): Record<string, Json> {
   return {};
 }
 
-// Yahoo "collections" look like { "0": { name: ... }, "1": { name: ... }, count: 2 }.
-function items(coll: Json, name: string): Json[] {
-  if (!coll || typeof coll !== "object") return [];
-  const count = Number(coll.count ?? Object.keys(coll).filter((k) => /^\d+$/.test(k)).length);
-  const out: Json[] = [];
-  for (let i = 0; i < count; i++) {
-    const v = coll[i]?.[name];
-    if (v !== undefined) out.push(v);
+// Every value stored under `key`, anywhere in the tree (not descending into matches).
+function findAll(node: Json, key: string, out: Json[] = []): Json[] {
+  if (Array.isArray(node)) node.forEach((n) => findAll(n, key, out));
+  else if (node && typeof node === "object") {
+    for (const [k, v] of Object.entries(node)) {
+      if (k === key) out.push(v);
+      else findAll(v, key, out);
+    }
   }
   return out;
 }
 
-function nflGame(json: Json) {
-  const user = merge(items(json?.fantasy_content?.users, "user")[0]);
-  return merge(items(user.games, "game")[0]);
-}
-
 function num(v: Json): number | undefined {
+  if (v === null || v === undefined || v === "") return undefined;
   const n = Number(v);
   return Number.isFinite(n) ? n : undefined;
 }
 
-export async function getYahooMatchups(token: string, week: number): Promise<Matchup[]> {
+// Yahoo lineup slot -> Sleeper-style slot name
+const SLOTS: Record<string, string> = {
+  "W/R/T": "FLEX",
+  "W/R": "WRRB_FLEX",
+  "W/T": "REC_FLEX",
+  "Q/W/R/T": "SUPER_FLEX",
+  D: "IDP_FLEX",
+};
+const BENCH = new Set(["BN", "IR", "IR+", "NA"]);
+
+interface YahooTeam {
+  team_key: string;
+  name?: string;
+  url?: string;
+  managers?: Json;
+  team_points?: { total?: string };
+  team_projected_points?: { total?: string };
+  team_live_projected_points?: { total?: string };
+}
+
+// League keys and the user's team keys this season (cached 10 minutes per token).
+async function getMyYahooTeams(token: string) {
   const [teamsJson, leaguesJson] = await Promise.all([
-    yget(token, "/users;use_login=1/games;game_keys=nfl/teams"),
-    yget(token, "/users;use_login=1/games;game_keys=nfl/leagues"),
+    yget(token, "/users;use_login=1/games;game_keys=nfl/teams", 600),
+    yget(token, "/users;use_login=1/games;game_keys=nfl/leagues", 600),
   ]);
+  const teamKeys = findAll(teamsJson, "team").map(merge).map((t) => String(t.team_key)).filter(Boolean);
+  const leagues = findAll(leaguesJson, "league")
+    .map(merge)
+    .map((l) => ({ key: String(l.league_key), name: String(l.name ?? "Yahoo league"), url: l.url as string | undefined }));
+  return { teamKeys: new Set(teamKeys), leagues };
+}
 
-  const myTeams = items(nflGame(teamsJson).teams, "team").map(merge);
-  const leagueNames = new Map<string, string>();
-  for (const l of items(nflGame(leaguesJson).leagues, "league").map(merge)) {
-    leagueNames.set(l.league_key, l.name);
-  }
+async function getRosterPlayers(
+  token: string,
+  teamKey: string,
+  week: number,
+  states: Awaited<ReturnType<typeof getGameStates>>
+): Promise<PlayerLine[]> {
+  const json = await yget(token, `/team/${teamKey}/roster;week=${week}/players/stats;type=week;week=${week}`);
+  return findAll(json, "player").map((raw, i) => {
+    const p = merge(raw);
+    const slotRaw = String(merge(p.selected_position).position ?? "BN");
+    const nflTeam = p.editorial_team_abbr ? String(p.editorial_team_abbr).toUpperCase() : undefined;
+    const game = gameFor(states, nflTeam);
+    const points = num(p.player_points?.total) ?? 0;
+    const projected = num(p.player_projected_points?.total);
+    return {
+      id: String(p.player_key ?? `slot-${i}`),
+      name: String(p.name?.full ?? "Unknown player"),
+      pos: String(p.display_position ?? p.primary_position ?? ""),
+      nflTeam,
+      points,
+      projected,
+      pace: paceOf(points, projected, game),
+      starter: !BENCH.has(slotRaw),
+      slot: SLOTS[slotRaw] ?? slotRaw,
+      state: game.state,
+      fraction: game.fraction,
+    };
+  });
+}
 
-  const results = await Promise.all(
-    myTeams.map(async (mine): Promise<Matchup | null> => {
-      const teamKey: string = mine.team_key;
-      const leagueKey = teamKey.split(".t.")[0];
-      const json = await yget(token, `/team/${teamKey}/matchups;weeks=${week}`);
-      const matchup = items(merge(json?.fantasy_content?.team).matchups, "matchup")[0];
-      if (!matchup) return null;
+// Without live or player projections: current score plus the pregame projection scaled by
+// how much of the starters' game time is still to be played.
+function estimateLive(score: number, pregame: number | undefined, players: PlayerLine[]) {
+  const starters = players.filter((p) => p.starter);
+  if (pregame == null || !starters.length) return pregame;
+  const remaining =
+    starters.reduce((sum, p) => sum + (p.state === "upcoming" ? 1 : p.state === "live" ? 1 - (p.fraction ?? 0) : 0), 0) /
+    starters.length;
+  return Math.round((score + pregame * remaining) * 100) / 100;
+}
 
-      const teamsColl = matchup["0"]?.teams ?? merge(matchup).teams;
-      const teams = items(teamsColl, "team").map(merge);
-      const me = teams.find((t) => t.team_key === teamKey);
-      const opp = teams.find((t) => t.team_key !== teamKey);
-      if (!me) return null;
+// One league's week: every matchup from the scoreboard, plus rosters for the teams asked for.
+export async function getYahooLeagueWeek(
+  token: string,
+  leagueKey: string,
+  season: string,
+  week: number,
+  rosters: "all" | "mine" = "all"
+): Promise<LeagueWeek & { myTeamKeys: Set<string> }> {
+  const [scoreboard, mine, states] = await Promise.all([
+    yget(token, `/league/${leagueKey}/scoreboard;week=${week}`),
+    getMyYahooTeams(token),
+    getGameStates(season, week),
+  ]);
+  const leagueMeta = merge(scoreboard?.fantasy_content?.league);
 
-      const side = (t: Record<string, Json>) => ({
-        teamName: t.name ?? "Unknown team",
-        ownerName: t.managers?.[0]?.manager?.nickname,
-        score: num(t.team_points?.total) ?? 0,
-        projected: num(t.team_projected_points?.total),
-      });
-
-      return {
-        id: `yahoo-${teamKey}-${week}`,
-        platform: "yahoo",
-        leagueName: leagueNames.get(leagueKey) ?? "Yahoo league",
-        week,
-        me: side(me),
-        opponent: opp ? side(opp) : null,
-        url: mine.url ?? "https://football.fantasysports.yahoo.com/",
-      };
-    })
+  const matchups = findAll(scoreboard, "matchup").map((m) =>
+    findAll(m, "team").map((t) => merge(t) as unknown as YahooTeam)
   );
 
+  // Rosters: everyone, or just the user's game.
+  const wanted = new Set<string>();
+  for (const teams of matchups) {
+    if (rosters === "all" || teams.some((t) => mine.teamKeys.has(t.team_key))) teams.forEach((t) => wanted.add(t.team_key));
+  }
+  const rosterEntries = await Promise.all(
+    [...wanted].map(async (k) => [k, await getRosterPlayers(token, k, week, states).catch(() => [])] as const)
+  );
+  const rosterByTeam = new Map(rosterEntries);
+
+  const teamWeek = (t: YahooTeam): TeamWeek => {
+    const players = rosterByTeam.get(t.team_key) ?? [];
+    const score = num(t.team_points?.total) ?? 0;
+    return {
+      key: t.team_key,
+      ownerIds: mine.teamKeys.has(t.team_key) ? ["me"] : [],
+      teamName: t.name ?? "Unknown team",
+      ownerName: findAll(t.managers, "nickname")[0],
+      score,
+      projected:
+        num(t.team_live_projected_points?.total) ?? // Yahoo's own live projection, when it sends one
+        liveProjection(players) ?? // built from player projections
+        estimateLive(score, num(t.team_projected_points?.total), players),
+      players: sortPlayers(players),
+      progress: players.length ? progressOf(players) : undefined,
+    };
+  };
+
+  return {
+    platform: "yahoo",
+    leagueId: leagueKey,
+    leagueName: String(leagueMeta.name ?? mine.leagues.find((l) => l.key === leagueKey)?.name ?? "Yahoo league"),
+    season,
+    week,
+    url: String(leagueMeta.url ?? "https://football.fantasysports.yahoo.com/"),
+    games: matchups.filter((ts) => ts.length).map((ts) => ({ a: teamWeek(ts[0]), b: ts[1] ? teamWeek(ts[1]) : null })),
+    myTeamKeys: mine.teamKeys,
+  };
+}
+
+export async function getYahooMatchups(token: string, season: string, week: number): Promise<Matchup[]> {
+  const { leagues } = await getMyYahooTeams(token);
+  const results = await Promise.all(
+    leagues.map(async (league): Promise<Matchup | null> => {
+      const lw = await getYahooLeagueWeek(token, league.key, season, week, "mine");
+      for (const g of lw.games) {
+        const mine = [g.a, g.b].find((t) => t && lw.myTeamKeys.has(t.key));
+        if (!mine) continue;
+        const opp = mine === g.a ? g.b : g.a;
+        return {
+          id: `yahoo-${mine.key}-${week}`,
+          platform: "yahoo",
+          leagueName: lw.leagueName,
+          week,
+          me: toSide(mine),
+          opponent: opp ? toSide(opp) : null,
+          url: lw.url,
+          leagueHref: `/league/yahoo/${league.key}?week=${week}`,
+        };
+      }
+      return null;
+    })
+  );
   return results.filter((m): m is Matchup => m !== null);
 }
 
-// TEMPORARY: what Yahoo returns vs. what the parser finds. Remove once Yahoo works.
-export async function debugYahoo(token: string, week: number) {
-  const clip = (x: Json) => JSON.stringify(x).slice(0, 4000);
+// TEMPORARY: raw samples + what the parser finds. Remove once Yahoo is confirmed working.
+export async function debugYahoo(token: string, season: string, week: number) {
+  const clip = (x: Json) => JSON.stringify(x).slice(0, 3000);
   const out: Record<string, Json> = { week };
   try {
-    const teamsJson = await yget(token, "/users;use_login=1/games;game_keys=nfl/teams");
-    out.teamsRaw = clip(teamsJson);
-    const game = nflGame(teamsJson);
-    out.gameKeys = Object.keys(game);
-    const myTeams = items(game.teams, "team").map(merge);
-    out.parsedTeams = myTeams.map((t) => ({ team_key: t.team_key, name: t.name }));
-
-    const leaguesJson = await yget(token, "/users;use_login=1/games;game_keys=nfl/leagues");
-    out.leaguesRaw = clip(leaguesJson);
-    out.parsedLeagues = items(nflGame(leaguesJson).leagues, "league").map(merge).map((l) => ({ key: l.league_key, name: l.name }));
-
-    const firstKey = myTeams[0]?.team_key ?? JSON.stringify(teamsJson).match(/"team_key":"([^"]+)"/)?.[1];
-    if (firstKey) {
-      const mJson = await yget(token, `/team/${firstKey}/matchups;weeks=${week}`);
-      out.matchupRaw = clip(mJson);
-      const matchup = items(merge(mJson?.fantasy_content?.team).matchups, "matchup")[0];
-      out.matchupFound = !!matchup;
-      out.matchupKeys = matchup ? Object.keys(matchup) : null;
+    const mine = await getMyYahooTeams(token);
+    out.myTeamKeys = [...mine.teamKeys];
+    out.leagues = mine.leagues;
+    const league = mine.leagues[0];
+    if (league) {
+      const sb = await yget(token, `/league/${league.key}/scoreboard;week=${week}`);
+      out.yahooSendsLiveProjection = JSON.stringify(sb).includes("team_live_projected_points");
+      out.scoreboardRaw = clip(sb);
+      const myKey = [...mine.teamKeys].find((k) => k.startsWith(league.key + "."));
+      if (myKey) out.rosterRaw = clip(await yget(token, `/team/${myKey}/roster;week=${week}/players/stats;type=week;week=${week}`));
+      const lw = await getYahooLeagueWeek(token, league.key, season, week, "mine");
+      out.parsed = {
+        leagueName: lw.leagueName,
+        games: lw.games.map((g) =>
+          [g.a, g.b].filter(Boolean).map((t) => ({
+            name: t!.teamName,
+            mine: t!.ownerIds.includes("me"),
+            score: t!.score,
+            projected: t!.projected,
+            progress: t!.progress,
+            starters: t!.players.filter((p) => p.starter).map((p) => `${p.slot} ${p.name} ${p.nflTeam ?? ""} ${p.points}${p.projected != null ? `/${p.projected}` : ""} ${p.state}`),
+          }))
+        ),
+      };
     }
   } catch (e) {
     out.error = e instanceof Error ? e.message : String(e);

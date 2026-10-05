@@ -5,6 +5,8 @@ import { anyLive, getGameStates, REFRESH_IDLE_SECONDS, REFRESH_LIVE_SECONDS } fr
 import { getEspnLeagueWeek } from "@/lib/providers/espn";
 import { currentWeek, getNflState, getSleeperLeagueWeek } from "@/lib/providers/sleeper";
 import type { LeagueWeek, TeamWeek } from "@/lib/providers/types";
+import { getYahooLeagueWeek } from "@/lib/providers/yahoo";
+import { yahooAccessToken } from "@/lib/yahooAccount";
 import AutoRefresh from "../../../components/AutoRefresh";
 import Header from "../../../Header";
 import LeagueView from "../../LeagueView";
@@ -42,6 +44,11 @@ export default async function LeaguePage({
     const creds = row.espn_s2 && row.swid ? { espnS2: decrypt(row.espn_s2), swid: decrypt(row.swid) } : undefined;
     load = () => getEspnLeagueWeek({ leagueId, leagueName: row.league_name, creds }, state.season, week);
     isMine = (t) => row.team_id != null && t.key === String(row.team_id);
+  } else if (platform === "yahoo") {
+    const { data: yahoo } = await supabase.from("yahoo_accounts").select("*").maybeSingle();
+    if (!yahoo) notFound();
+    load = async () => getYahooLeagueWeek(await yahooAccessToken(supabase, yahoo), leagueId, state.season, week, "all");
+    isMine = (t) => t.ownerIds.includes("me");
   } else {
     notFound();
   }

@@ -17,6 +17,22 @@ export interface PlayerLine {
   starter: boolean;
   slot?: string; // lineup slot for starters, Sleeper-style: QB, RB, WR, TE, FLEX, SUPER_FLEX, K, DEF…
   state: GameState;
+  fraction?: number; // share of the player's NFL game played, 0..1
+}
+
+// Team projection that updates during games: actual points for finished players, points plus the
+// unplayed share of the projection for players mid-game, and the full projection for players yet to play.
+export function liveProjection(players: PlayerLine[]): number | undefined {
+  const starters = players.filter((p) => p.starter);
+  if (!starters.some((p) => p.projected != null)) return undefined;
+  let total = 0;
+  for (const p of starters) {
+    const proj = p.projected ?? 0;
+    if (p.state === "upcoming") total += Math.max(p.points, proj);
+    else if (p.state === "live") total += p.points + Math.max(0, proj * (1 - (p.fraction ?? 0)));
+    else total += p.points;
+  }
+  return Math.round(total * 100) / 100;
 }
 
 // Lineup display order. Anything not listed (e.g. IDP slots) goes after DEF.

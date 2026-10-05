@@ -1,5 +1,14 @@
 import { ESPN_PRO_TEAMS, gameFor, getGameStates, paceOf } from "@/lib/nfl";
-import { progressOf, sortPlayers, toSide, type LeagueWeek, type Matchup, type PlayerLine, type TeamWeek } from "./types";
+import {
+  liveProjection,
+  progressOf,
+  sortPlayers,
+  toSide,
+  type LeagueWeek,
+  type Matchup,
+  type PlayerLine,
+  type TeamWeek,
+} from "./types";
 
 // ESPN has no official API; this is the same endpoint fantasy.espn.com uses.
 // Public leagues work with just the league ID. Private leagues need the
@@ -157,6 +166,7 @@ export async function getEspnLeagueWeek(
         starter: !BENCH_SLOTS.has(e.lineupSlotId ?? 20),
         slot: SLOTS[e.lineupSlotId ?? -1],
         state: game.state,
+        fraction: game.fraction,
       };
     });
     return {
@@ -165,7 +175,7 @@ export async function getEspnLeagueWeek(
       teamName: teamName(t),
       ownerName: ownerName(data, t),
       score: s.totalPointsLive ?? s.totalPoints ?? 0,
-      projected: s.totalProjectedPointsLive,
+      projected: s.totalProjectedPointsLive ?? liveProjection(players),
       players: sortPlayers(players),
       progress: players.length ? progressOf(players) : undefined,
     };

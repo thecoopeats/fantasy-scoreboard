@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
   try {
     const token = await yahooAccessToken(supabase, yahoo);
     const state = await getNflState();
-    return NextResponse.json({ config, connection, ...(await debugYahoo(token, currentWeek(state))) });
+    return NextResponse.json({ config, connection, ...(await debugYahoo(token, state.season, currentWeek(state))) });
   } catch (e) {
     return NextResponse.json({ config, connection, error: e instanceof Error ? e.message : String(e) });
   }

@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
   if (yahoo) {
     tasks.push({
       source: "Yahoo",
-      run: async () => getYahooMatchups(await yahooAccessToken(supabase, yahoo), week),
+      run: async () => getYahooMatchups(await yahooAccessToken(supabase, yahoo), season, week),
     });
   }
 

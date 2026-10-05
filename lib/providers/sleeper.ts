@@ -1,7 +1,16 @@
 import { unstable_cache } from "next/cache";
 import { memo } from "@/lib/memo";
 import { gameFor, getGameStates, paceOf } from "@/lib/nfl";
-import { progressOf, sortPlayers, toSide, type LeagueWeek, type Matchup, type PlayerLine, type TeamWeek } from "./types";
+import {
+  liveProjection,
+  progressOf,
+  sortPlayers,
+  toSide,
+  type LeagueWeek,
+  type Matchup,
+  type PlayerLine,
+  type TeamWeek,
+} from "./types";
 
 // Sleeper's public API: https://docs.sleeper.com (no auth required).
 const BASE = "https://api.sleeper.app/v1";
@@ -143,6 +152,7 @@ export async function getSleeperLeagueWeek(leagueId: string, season: string, wee
         starter: starters.includes(id),
         slot: slotOf.get(id),
         state: game.state,
+        fraction: game.fraction,
       };
     });
     return {
@@ -151,6 +161,7 @@ export async function getSleeperLeagueWeek(leagueId: string, season: string, wee
       teamName: user?.metadata?.team_name || user?.display_name || `Team ${m.roster_id}`,
       ownerName: user?.display_name,
       score: m.points ?? 0,
+      projected: liveProjection(lines),
       players: sortPlayers(lines),
       progress: progressOf(lines),
     };
