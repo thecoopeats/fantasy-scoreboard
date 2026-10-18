@@ -112,6 +112,7 @@ code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font-si
 
 .team { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px; }
 .team .name { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team .record { color: var(--muted); font-size: 0.8rem; font-weight: 500; font-variant-numeric: tabular-nums; margin-left: 6px; }
 .team .owner { display: block; color: var(--muted); font-size: 0.8rem; font-weight: 400; }
 .team .score { font-size: 1.4rem; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
 .team .proj { display: block; color: var(--muted); font-size: 0.75rem; font-weight: 400; }
@@ -169,7 +170,7 @@ table.players td { padding: 8px 12px; border-top: 1px solid var(--border); }
 table.players td .muted { font-size: 0.75rem; }
 table.players .num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
 .bench { font-size: 0.65rem; text-transform: uppercase; color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; margin-left: 6px; }
-@media (max-width: 560px) { table.players th:nth-child(3), table.players td:nth-child(3) { display: none; } }
+@media (max-width: 560px) { table.players:not(.available-players) th:nth-child(3), table.players:not(.available-players) td:nth-child(3) { display: none; } }
 /* ESPN add-league wizard */
 .wizard { border-top: 1px solid var(--border); padding-top: 14px; }
 .step-title { display: flex; align-items: center; gap: 8px; font-weight: 600; margin: 14px 0 6px; }
@@ -194,3 +195,44 @@ kbd { background: var(--panel-2); border: 1px solid var(--border); border-bottom
 details.available { margin-top: 16px; }
 details.available > summary { font-size: 0.95rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
 .legend { font-size: 0.8rem; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+
+/* Big-play celebration */
+.celebration-wrap {
+  position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center;
+  padding: 16px; pointer-events: none;
+}
+.celebration {
+  position: relative; pointer-events: auto; width: 100%; max-width: 340px; text-align: center;
+  background: var(--panel); border: 2px solid var(--accent); border-radius: 16px; padding: 22px 20px 18px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6); animation: celebrate-pop 0.35s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+.celebration .close {
+  position: absolute; top: 6px; right: 8px; margin: 0; padding: 2px 8px; background: none;
+  color: var(--muted); font-size: 1.4rem; font-weight: 400; line-height: 1;
+}
+.celebration .close:hover { color: var(--text); }
+.celebration-title { font-size: 1.5rem; font-weight: 800; margin-bottom: 6px; }
+.celebration-player { font-size: 1.1rem; font-weight: 700; }
+.celebration-player .muted { font-size: 0.8rem; font-weight: 400; }
+.celebration-points { font-size: 2rem; font-weight: 800; color: var(--win); font-variant-numeric: tabular-nums; margin: 4px 0; }
+.celebration-team { font-weight: 600; }
+.celebration-team .muted { font-size: 0.8rem; font-weight: 400; }
+
+.confetti { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }
+.confetti span {
+  position: absolute; left: 0; top: 0; border-radius: 2px; opacity: 0;
+  animation: confetti-burst 1.4s cubic-bezier(0.15, 0.7, 0.35, 1) forwards;
+}
+@keyframes confetti-burst {
+  0% { transform: translate(-50%, -50%) rotate(0); opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translate(calc(var(--dx) - 50%), calc(var(--dy) + 80px - 50%)) rotate(var(--rot)); opacity: 0; }
+}
+@keyframes celebrate-pop {
+  from { transform: scale(0.6); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .celebration { animation: none; }
+  .confetti { display: none; }
+}

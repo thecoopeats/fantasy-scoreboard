@@ -18,6 +18,8 @@ export interface PlayerLine {
   slot?: string; // lineup slot for starters, Sleeper-style: QB, RB, WR, TE, FLEX, SUPER_FLEX, K, DEF…
   state: GameState;
   fraction?: number; // share of the player's NFL game played, 0..1
+  tds?: number; // touchdowns this week, where the platform sends stat lines
+  seasonPoints?: number; // season total so far, in the league's scoring (top available players only)
 }
 
 // Team projection that updates during games: actual points for finished players, points plus the
@@ -65,6 +67,7 @@ export interface Progress {
 export interface Side {
   teamName: string;
   ownerName?: string;
+  record?: string; // season win-loss(-tie), e.g. "5-2"
   score: number;
   projected?: number;
   progress?: Progress;
@@ -107,6 +110,11 @@ export interface MatchupsResponse {
   errors: { source: string; message: string }[];
 }
 
+export function formatRecord(wins?: number, losses?: number, ties?: number): string | undefined {
+  if (wins == null || losses == null) return undefined;
+  return `${wins}-${losses}${ties ? `-${ties}` : ""}`;
+}
+
 export function progressOf(players: PlayerLine[]): Progress {
   const p = { done: 0, live: 0, upcoming: 0 };
   for (const pl of players) {
@@ -122,6 +130,7 @@ export function toSide(t: TeamWeek): Side {
   return {
     teamName: t.teamName,
     ownerName: t.ownerName,
+    record: t.record,
     score: t.score,
     projected: t.projected,
     progress: t.progress,

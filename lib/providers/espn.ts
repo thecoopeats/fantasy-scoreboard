@@ -1,5 +1,6 @@
 import { ESPN_PRO_TEAMS, gameFor, getGameStates, paceOf } from "@/lib/nfl";
 import {
+  formatRecord,
   liveProjection,
   progressOf,
   sortPlayers,
@@ -25,6 +26,7 @@ interface Team {
   location?: string;
   nickname?: string;
   owners?: string[];
+  record?: { overall?: { wins?: number; losses?: number; ties?: number } };
 }
 interface Member { id: string; displayName?: string; firstName?: string; lastName?: string }
 interface RosterEntry {
@@ -38,8 +40,16 @@ interface RosterEntry {
       fullName?: string;
       proTeamId?: number;
       defaultPositionId?: number;
-      // statSourceId 0 = actual, 1 = projected; appliedTotal is in the league's scoring.
-      stats?: { scoringPeriodId?: number; statSourceId?: number; appliedTotal?: number }[];
+      // statSourceId 0 = actual, 1 = projected; scoringPeriodId 0 = season total; appliedTotal is in the
+      // league's scoring. `stats` maps ESPN stat ids to raw values.
+      stats?: {
+        scoringPeriodId?: number;
+        statSourceId?: number;
+        statSplitTypeId?: number;
+        seasonId?: number;
+        appliedTotal?: number;
+        stats?: Record<string, number>;
+      }[];
     };
   };
 }
@@ -62,6 +72,8 @@ interface LeagueData {
 
 const POSITIONS: Record<number, string> = { 1: "QB", 2: "RB", 3: "WR", 4: "TE", 5: "K", 16: "DEF" };
 const BENCH_SLOTS = new Set([20, 21]); // bench, IR
+// Passing, rushing, receiving, kick return and punt return touchdowns.
+const TD_STAT_IDS = ["4", "25", "43", "101", "102"];
 // ESPN lineupSlotId -> Sleeper-style slot name
 const SLOTS: Record<number, string> = {
   0: "QB", 2: "RB", 3: "WRRB_FLEX", 4: "WR", 5: "REC_FLEX", 6: "TE", 7: "SUPER_FLEX", 16: "DEF", 17: "K", 23: "FLEX",
@@ -187,6 +199,9 @@ export async function getEspnLeagueWeek(
             p?.stats?.find((s) => s.statSourceId === source && s.scoringPeriodId === week)?.appliedTotal;
           const points = stat(0) ?? 0;
           const projected = stat(1);
+          const seasonPoints = p?.stats?.find(
+            (s) => s.statSourceId === 0 && s.scoringPeriodId === 0 && (s.seasonId == null || String(s.seasonId) === season)
+          )?.appliedTotal;
           return {
             id: String(fa.id ?? p?.id ?? `fa-${i}`),
             name: p?.fullName ?? "Unknown player",
@@ -198,6 +213,7 @@ export async function getEspnLeagueWeek(
             starter: false,
             state: game.state,
             fraction: game.fraction,
+            seasonPoints,
           };
         })
         .filter((p) => p.points > 0)
@@ -213,6 +229,7 @@ export async function getEspnLeagueWeek(
       const game = gameFor(states, nflTeam);
       const points = e.playerPoolEntry?.appliedStatTotal ?? 0;
       const projected = p?.stats?.find((s) => s.statSourceId === 1 && s.scoringPeriodId === week)?.appliedTotal;
+      const actual = p?.stats?.find((s) => s.statSourceId === 0 && s.scoringPeriodId === week)?.stats;
       return {
         id: String(e.playerId ?? p?.id ?? e.playerPoolEntry?.id ?? `slot-${i}`),
         name: p?.fullName ?? "Unknown player",
@@ -225,6 +242,7 @@ export async function getEspnLeagueWeek(
         slot: SLOTS[e.lineupSlotId ?? -1],
         state: game.state,
         fraction: game.fraction,
+        tds: actual ? TD_STAT_IDS.reduce((n, id) => n + (actual[id] ?? 0), 0) : undefined,
       };
     });
     return {
@@ -232,6 +250,7 @@ export async function getEspnLeagueWeek(
       ownerIds: (t?.owners ?? []).map((o) => o.toUpperCase()),
       teamName: teamName(t),
       ownerName: ownerName(data, t),
+      record: formatRecord(t?.record?.overall?.wins, t?.record?.overall?.losses, t?.record?.overall?.ties),
       score: s.totalPointsLive ?? s.totalPoints ?? 0,
       projected: s.totalProjectedPointsLive ?? liveProjection(players),
       players: sortPlayers(players),
