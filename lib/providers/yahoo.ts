@@ -1,5 +1,5 @@
 import { gameFor, getGameStates, paceOf } from "@/lib/nfl";
-import { liveProjection, progressOf, sortPlayers, toSide, type LeagueWeek, type Matchup, type PlayerLine, type TeamWeek } from "./types";
+import { formatRecord, liveProjection, progressOf, sortPlayers, toSide, type LeagueWeek, type Matchup, type PlayerLine, type TeamWeek } from "./types";
 
 // Yahoo Fantasy Sports API (official, OAuth 2.0):
 // https://developer.yahoo.com/fantasysports/guide/
@@ -160,16 +160,49 @@ async function getRosterPlayers(token: string, teamKey: string, week: number, st
   return parsePlayers(json, states);
 }
 
-// Available players (free agents + waivers) with the most points this week.
+// Available players (free agents + waivers) with the most points this week, with their season totals.
 async function getAvailablePlayers(token: string, leagueKey: string, week: number, states: GameStates) {
   const json = await yget(
     token,
     `/league/${leagueKey}/players;status=A;sort=PTS;sort_type=week;sort_week=${week};count=25/stats;type=week;week=${week}`
   );
-  return parsePlayers(json, states)
+  const players = parsePlayers(json, states)
     .map((p) => ({ ...p, starter: false, slot: undefined }))
     .filter((p) => p.points > 0)
     .sort((a, b) => b.points - a.points);
+  if (!players.length) return players;
+  const season = await yget(
+    token,
+    `/league/${leagueKey}/players;player_keys=${players.map((p) => p.id).join(",")}/stats;type=season`
+  ).catch(() => null);
+  const seasonPoints = new Map(
+    findAll(season, "player").map((raw) => {
+      const p = merge(raw);
+      return [String(p.player_key), num(p.player_points?.total)] as const;
+    })
+  );
+  return players.map((p) => ({ ...p, seasonPoints: seasonPoints.get(p.id) }));
+}
+
+// Season win-loss(-tie) per team key (cached 10 minutes per token).
+async function getRecords(token: string, leagueKey: string) {
+  const json = await yget(token, `/league/${leagueKey}/standings`, 600);
+  const records = new Map<string, string | undefined>();
+  for (const raw of findAll(json, "team")) {
+    const t = merge(raw);
+    const o = t.team_standings?.outcome_totals;
+    if (t.team_key && o) records.set(String(t.team_key), formatRecord(num(o.wins), num(o.losses), num(o.ties)));
+  }
+  return records;
+}
+
+// Passing, rushing, receiving and return touchdowns.
+const TD_STAT_IDS = new Set(["5", "10", "13", "15"]);
+
+function touchdowns(playerStats: Json): number | undefined {
+  const stats = findAll(playerStats, "stat");
+  if (!stats.length) return undefined;
+  return stats.reduce((n, st) => n + (TD_STAT_IDS.has(String(st?.stat_id)) ? (num(st?.value) ?? 0) : 0), 0);
 }
 
 function parsePlayers(json: Json, states: GameStates): PlayerLine[] {
@@ -192,6 +225,7 @@ function parsePlayers(json: Json, states: GameStates): PlayerLine[] {
       slot: SLOTS[slotRaw] ?? slotRaw,
       state: game.state,
       fraction: game.fraction,
+      tds: touchdowns(p.player_stats),
     };
   });
 }
@@ -215,10 +249,11 @@ export async function getYahooLeagueWeek(
   week: number,
   rosters: "all" | "mine" = "all"
 ): Promise<LeagueWeek & { myTeamKeys: Set<string> }> {
-  const [scoreboard, mine, states] = await Promise.all([
+  const [scoreboard, mine, states, records] = await Promise.all([
     yget(token, `/league/${leagueKey}/scoreboard;week=${week}`),
     getMyYahooTeams(token),
     getGameStates(season, week),
+    getRecords(token, leagueKey).catch(() => new Map<string, string | undefined>()),
   ]);
   const leagueMeta = merge(scoreboard?.fantasy_content?.league);
 
@@ -246,6 +281,7 @@ export async function getYahooLeagueWeek(
       ownerIds: mine.teamKeys.has(t.team_key) ? ["me"] : [],
       teamName: t.name ?? "Unknown team",
       ownerName: findAll(t.managers, "nickname")[0],
+      record: records.get(t.team_key),
       score,
       projected:
         num(t.team_live_projected_points?.total) ?? // Yahoo's own live projection, when it sends one

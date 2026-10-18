@@ -2,6 +2,7 @@ import { unstable_cache } from "next/cache";
 import { memo } from "@/lib/memo";
 import { gameFor, getGameStates, paceOf } from "@/lib/nfl";
 import {
+  formatRecord,
   liveProjection,
   progressOf,
   sortPlayers,
@@ -63,10 +64,12 @@ const getPlayers = memo(60 * 60 * 1000, unstable_cache(
 // Stat lines per player for a week: projected or actual (not documented by Sleeper, so failures
 // just mean no projections / no free-agent scores).
 type StatLines = Record<string, Record<string, number>>;
-async function fetchStatLines(kind: "projections" | "stats", season: string, week: number): Promise<StatLines> {
+// Without a week, the season totals so far.
+async function fetchStatLines(kind: "projections" | "stats", season: string, week?: number): Promise<StatLines> {
   const positions = ["QB", "RB", "WR", "TE", "K", "DEF"].map((p) => `position%5B%5D=${p}`).join("&");
+  const period = week == null ? season : `${season}/${week}`;
   try {
-    const res = await fetch(`https://api.sleeper.com/${kind}/nfl/${season}/${week}?season_type=regular&${positions}`, {
+    const res = await fetch(`https://api.sleeper.com/${kind}/nfl/${period}?season_type=regular&${positions}`, {
       cache: "no-store",
     });
     if (!res.ok) return {};
@@ -88,6 +91,13 @@ const getProjectionStats = memo(
 
 // Actual stats change during games, so only keep them briefly (in memory, no shared cache writes).
 const getWeekStats = memo(30 * 1000, (season: string, week: number) => fetchStatLines("stats", season, week));
+const getSeasonStats = memo(5 * 60 * 1000, (season: string) => fetchStatLines("stats", season));
+
+const TD_STATS = ["pass_td", "rush_td", "rec_td", "pr_td", "kr_td", "def_td", "st_td"];
+function touchdowns(stats: Record<string, number> | undefined) {
+  if (!stats) return undefined;
+  return TD_STATS.reduce((n, k) => n + (typeof stats[k] === "number" ? stats[k] : 0), 0);
+}
 
 // Score a stat line (projected or actual) with the league's own scoring settings.
 function scoreStats(stats: Record<string, number> | undefined, scoring: Record<string, number>) {
@@ -109,7 +119,13 @@ interface League {
   scoring_settings?: Record<string, number>;
   roster_positions?: string[];
 }
-interface Roster { roster_id: number; owner_id: string | null; co_owners?: string[] | null; players?: string[] | null }
+interface Roster {
+  roster_id: number;
+  owner_id: string | null;
+  co_owners?: string[] | null;
+  players?: string[] | null;
+  settings?: { wins?: number; losses?: number; ties?: number };
+}
 interface User { user_id: string; display_name: string; metadata?: { team_name?: string } }
 interface SleeperMatchup {
   roster_id: number;
@@ -126,7 +142,7 @@ export async function getSleeperLeagueWeek(
   week: number,
   opts: { freeAgents?: boolean } = {}
 ): Promise<LeagueWeek> {
-  const [league, rosters, users, matchups, players, states, projections] = await Promise.all([
+  const [league, rosters, users, matchups, players, states, projections, weekStats] = await Promise.all([
     get<League>(`/league/${leagueId}`, 600),
     get<Roster[]>(`/league/${leagueId}/rosters`, 600),
     get<User[]>(`/league/${leagueId}/users`, 600),
@@ -134,6 +150,7 @@ export async function getSleeperLeagueWeek(
     getPlayers(),
     getGameStates(season, week),
     getProjectionStats(season, week),
+    getWeekStats(season, week),
   ]);
   const scoring = league.scoring_settings ?? {};
 
@@ -165,6 +182,7 @@ export async function getSleeperLeagueWeek(
         slot: slotOf.get(id),
         state: game.state,
         fraction: game.fraction,
+        tds: touchdowns(weekStats[id]),
       };
     });
     return {
@@ -172,6 +190,7 @@ export async function getSleeperLeagueWeek(
       ownerIds: [roster?.owner_id, ...(roster?.co_owners ?? [])].filter((x): x is string => !!x),
       teamName: user?.metadata?.team_name || user?.display_name || `Team ${m.roster_id}`,
       ownerName: user?.display_name,
+      record: formatRecord(roster?.settings?.wins, roster?.settings?.losses, roster?.settings?.ties),
       score: m.points ?? 0,
       projected: liveProjection(lines),
       players: sortPlayers(lines),
@@ -195,8 +214,8 @@ export async function getSleeperLeagueWeek(
     const rostered = new Set<string>();
     for (const m of matchups ?? []) for (const id of [...(m.players ?? []), ...(m.starters ?? [])]) rostered.add(id);
     for (const r of rosters) for (const id of r.players ?? []) rostered.add(id);
-    const stats = await getWeekStats(season, week);
-    freeAgents = Object.entries(stats)
+    const seasonStats = await getSeasonStats(season);
+    freeAgents = Object.entries(weekStats)
       .filter(([id]) => !rostered.has(id))
       .map(([id, st]) => ({ id, points: scoreStats(st, scoring) ?? 0 }))
       .filter((p) => p.points > 0)
@@ -217,6 +236,7 @@ export async function getSleeperLeagueWeek(
           starter: false,
           state: game.state,
           fraction: game.fraction,
+          seasonPoints: scoreStats(seasonStats[id], scoring),
         };
       });
   }

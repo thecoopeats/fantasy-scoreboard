@@ -10,6 +10,7 @@ function TeamLine({ team, mine, leading }: { team: TeamWeek; mine: boolean; lead
     <div className={`team${mine ? " me" : ""}${leading ? " leading" : ""}`}>
       <div className="name">
         {team.teamName}
+        {team.record && <span className="record">{team.record}</span>}
         {mine && <span className="you">you</span>}
         {team.ownerName && team.ownerName !== team.teamName && <span className="owner">{team.ownerName}</span>}
         <ProgressLine progress={team.progress} />
@@ -131,12 +132,13 @@ export default function LeagueView({
                 <div className="card empty muted">No points from available players yet.</div>
               ) : (
                 <div className="card" style={{ padding: 0 }}>
-                  <table className="players">
+                  <table className="players available-players">
                     <thead>
                       <tr>
                         <th>#</th>
                         <th>Player</th>
                         <th className="num">Pts</th>
+                        <th className="num">Season</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -149,6 +151,7 @@ export default function LeagueView({
                             <span className="muted"> {[p.pos, p.nflTeam].filter(Boolean).join(" · ")}</span>
                           </td>
                           <td className="num"><PlayerPoints player={p} /></td>
+                          <td className="num">{p.seasonPoints != null ? fmt(p.seasonPoints) : "–"}</td>
                         </tr>
                       ))}
                     </tbody>
