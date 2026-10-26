@@ -14,7 +14,8 @@ export const ESPN_PRO_TEAMS: Record<number, string> = {
 
 interface Scoreboard {
   events?: {
-    status?: { clock?: number; period?: number; type?: { state?: string } };
+    date?: string;
+    status?: { clock?: number; displayClock?: string; period?: number; type?: { state?: string; name?: string } };
     competitions?: { competitors?: { team?: { abbreviation?: string } }[] }[];
   }[];
 }
@@ -22,11 +23,21 @@ interface Scoreboard {
 export interface TeamGame {
   state: GameState;
   fraction: number; // share of the game played, 0..1
+  clock?: string; // live games: "Q3 2:54", "Half", "OT 4:10"
+  kickoff?: string; // ISO start time
 }
 
 export type GameStates = Map<string, TeamGame>;
 
 const QUARTER = 15 * 60;
+
+function clockLabel(status: NonNullable<NonNullable<Scoreboard["events"]>[number]["status"]>): string {
+  const period = status.period ?? 1;
+  if (status.type?.name === "STATUS_HALFTIME") return "Half";
+  const q = period <= 4 ? `Q${period}` : period === 5 ? "OT" : `${period - 4}OT`;
+  if (status.type?.name === "STATUS_END_PERIOD") return `End ${q}`;
+  return status.displayClock ? `${q} ${status.displayClock}` : q;
+}
 
 export async function getGameStates(season: string, week: number): Promise<GameStates> {
   const url = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${season}&seasontype=2&week=${week}`;
@@ -39,11 +50,11 @@ export async function getGameStates(season: string, week: number): Promise<GameS
       const s = e.status?.type?.state;
       let game: TeamGame;
       if (s === "post") game = { state: "done", fraction: 1 };
-      else if (s === "in") {
-        const period = e.status?.period ?? 1;
-        const played = period > 4 ? 4 * QUARTER : (period - 1) * QUARTER + (QUARTER - (e.status?.clock ?? QUARTER));
-        game = { state: "live", fraction: Math.min(1, Math.max(0, played / (4 * QUARTER))) };
-      } else game = { state: "upcoming", fraction: 0 };
+      else if (s === "in" && e.status) {
+        const period = e.status.period ?? 1;
+        const played = period > 4 ? 4 * QUARTER : (period - 1) * QUARTER + (QUARTER - (e.status.clock ?? QUARTER));
+        game = { state: "live", fraction: Math.min(1, Math.max(0, played / (4 * QUARTER))), clock: clockLabel(e.status) };
+      } else game = { state: "upcoming", fraction: 0, kickoff: e.date };
       for (const c of e.competitions?.[0]?.competitors ?? []) {
         const abbr = c.team?.abbreviation;
         if (abbr) states.set(ESPN_ABBR_FIX[abbr] ?? abbr, game);

@@ -159,6 +159,8 @@ h3.section { font-size: 0.95rem; color: var(--muted); text-transform: uppercase;
 .slot { width: 30px; flex-shrink: 0; font-size: 0.65rem; font-weight: 700; color: var(--muted); letter-spacing: 0.02em; }
 .pl-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pl-name .muted { font-size: 0.75rem; }
+.game-clock { flex-shrink: 0; font-size: 0.72rem; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; margin: 0 4px; }
+.game-clock.live { color: var(--win); font-weight: 600; }
 .pl-pts { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
 .pl-proj { color: var(--muted); font-weight: 400; font-size: 0.75em; margin-left: 4px; }
 .pace-over { color: var(--win); }

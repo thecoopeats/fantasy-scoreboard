@@ -182,6 +182,8 @@ export async function getSleeperLeagueWeek(
         slot: slotOf.get(id),
         state: game.state,
         fraction: game.fraction,
+        clock: game.clock,
+        kickoff: game.kickoff,
         tds: touchdowns(weekStats[id]),
       };
     });
@@ -236,6 +238,8 @@ export async function getSleeperLeagueWeek(
           starter: false,
           state: game.state,
           fraction: game.fraction,
+          clock: game.clock,
+          kickoff: game.kickoff,
           seasonPoints: scoreStats(seasonStats[id], scoring),
         };
       });
