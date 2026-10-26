@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { LeagueWeek, PlayerLine, TeamWeek } from "@/lib/providers/types";
 import { PlayerPoints, ProgressLine, StateDot } from "../components/GameProgress";
+import GameClock from "../components/GameClock";
 import Lineups from "../components/Lineups";
 
 const fmt = (n: number) => n.toFixed(2);
@@ -114,6 +115,7 @@ export default function LeagueView({
                         {p.name}
                         <span className="muted"> {[p.pos, p.nflTeam].filter(Boolean).join(" · ")}</span>
                         {!p.starter && <span className="bench">bench</span>}
+                        <GameClock player={p} />
                       </td>
                       <td className="muted">{p.fantasyTeam}</td>
                       <td className="num"><PlayerPoints player={p} /></td>
@@ -149,6 +151,7 @@ export default function LeagueView({
                             <StateDot state={p.state} />
                             {p.name}
                             <span className="muted"> {[p.pos, p.nflTeam].filter(Boolean).join(" · ")}</span>
+                            <GameClock player={p} />
                           </td>
                           <td className="num"><PlayerPoints player={p} /></td>
                           <td className="num">{p.seasonPoints != null ? fmt(p.seasonPoints) : "–"}</td>

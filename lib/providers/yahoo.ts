@@ -225,6 +225,8 @@ function parsePlayers(json: Json, states: GameStates): PlayerLine[] {
       slot: SLOTS[slotRaw] ?? slotRaw,
       state: game.state,
       fraction: game.fraction,
+      clock: game.clock,
+      kickoff: game.kickoff,
       tds: touchdowns(p.player_stats),
     };
   });

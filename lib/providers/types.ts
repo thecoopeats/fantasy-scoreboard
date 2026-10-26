@@ -18,6 +18,8 @@ export interface PlayerLine {
   slot?: string; // lineup slot for starters, Sleeper-style: QB, RB, WR, TE, FLEX, SUPER_FLEX, K, DEF…
   state: GameState;
   fraction?: number; // share of the player's NFL game played, 0..1
+  clock?: string; // game clock while live, e.g. "Q3 2:54"
+  kickoff?: string; // ISO start time while upcoming
   tds?: number; // touchdowns this week, where the platform sends stat lines
   seasonPoints?: number; // season total so far, in the league's scoring (top available players only)
 }

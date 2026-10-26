@@ -213,6 +213,8 @@ export async function getEspnLeagueWeek(
             starter: false,
             state: game.state,
             fraction: game.fraction,
+            clock: game.clock,
+            kickoff: game.kickoff,
             seasonPoints,
           };
         })
@@ -242,6 +244,8 @@ export async function getEspnLeagueWeek(
         slot: SLOTS[e.lineupSlotId ?? -1],
         state: game.state,
         fraction: game.fraction,
+        clock: game.clock,
+        kickoff: game.kickoff,
         tds: actual ? TD_STAT_IDS.reduce((n, id) => n + (actual[id] ?? 0), 0) : undefined,
       };
     });

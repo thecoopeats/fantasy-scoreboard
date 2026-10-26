@@ -1,4 +1,5 @@
 import { slotLabel, type PlayerLine } from "@/lib/providers/types";
+import GameClock from "./GameClock";
 import { PlayerPoints, StateDot } from "./GameProgress";
 
 interface LineupTeam {
@@ -18,6 +19,7 @@ function Lineup({ team }: { team: LineupTeam }) {
           <span className="pl-name">
             {p.name} <span className="muted">{[p.pos, p.nflTeam].filter(Boolean).join(" · ")}</span>
           </span>
+          <GameClock player={p} />
           <PlayerPoints player={p} />
         </div>
       ))}
