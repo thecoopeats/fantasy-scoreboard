@@ -1,6 +1,8 @@
+import { buildGameLog, getTeamSchedule } from "@/lib/gameLog";
 import { ESPN_PRO_TEAMS, gameFor, getGameStates, paceOf } from "@/lib/nfl";
 import {
   formatRecord,
+  type GameLog,
   liveProjection,
   progressOf,
   sortPlayers,
@@ -304,4 +306,35 @@ export async function getEspnMatchup(
     url: `https://fantasy.espn.com/football/boxscore?leagueId=${opts.leagueId}&matchupPeriodId=${week}&seasonId=${season}&teamId=${opts.teamId}`,
     leagueHref: `/league/espn/${opts.leagueId}?week=${week}`,
   };
+}
+
+// Week-by-week fantasy points for one player, in this league's scoring (same request as ESPN's player card).
+export async function getEspnGameLog(
+  leagueId: string,
+  season: string,
+  playerId: string,
+  throughWeek: number,
+  creds?: EspnCreds
+): Promise<GameLog> {
+  const data = await fetchLeague(leagueId, season, ["kona_playercard"], creds, `&scoringPeriodId=${throughWeek}`, {
+    players: {
+      filterIds: { value: [Number(playerId)] },
+      filterStatsForTopScoringPeriodIds: { value: 18, additionalValue: [`00${season}`, `10${season}`] },
+    },
+  });
+  const entry = (data.players ?? []).find((p) => String(p.id ?? p.player?.id) === playerId) ?? data.players?.[0];
+  const p = entry?.player;
+  const nflTeam = p?.proTeamId ? ESPN_PRO_TEAMS[p.proTeamId] : undefined;
+  const points = new Map<number, { points?: number; projected?: number }>();
+  for (const s of p?.stats ?? []) {
+    const w = s.scoringPeriodId ?? 0;
+    if (w < 1 || w > throughWeek || (s.seasonId != null && String(s.seasonId) !== season)) continue;
+    // statSplitTypeId 1 = a single week; skip season/aggregate splits.
+    if (s.statSplitTypeId != null && s.statSplitTypeId !== 1) continue;
+    const cur = points.get(w) ?? {};
+    if (s.statSourceId === 0) cur.points = s.appliedTotal ?? 0;
+    else if (s.statSourceId === 1) cur.projected = s.appliedTotal;
+    points.set(w, cur);
+  }
+  return buildGameLog(throughWeek, points, await getTeamSchedule(nflTeam, season));
 }

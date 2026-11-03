@@ -3,6 +3,7 @@ import type { LeagueWeek, PlayerLine, TeamWeek } from "@/lib/providers/types";
 import { PlayerPoints, ProgressLine, StateDot } from "../components/GameProgress";
 import GameClock from "../components/GameClock";
 import Lineups from "../components/Lineups";
+import AvailablePlayers from "./AvailablePlayers";
 
 const fmt = (n: number) => n.toFixed(2);
 
@@ -129,37 +130,11 @@ export default function LeagueView({
           {lw.freeAgents && (
             <details className="available">
               <summary>Top available players · Week {week}</summary>
-              <p className="muted" style={{ margin: "4px 0 10px" }}>Players not on any team in this league.</p>
+              <p className="muted" style={{ margin: "4px 0 10px" }}>Players not on any team in this league, ranked by Week {week} points. Tap a player for their game log.</p>
               {lw.freeAgents.length === 0 ? (
                 <div className="card empty muted">No points from available players yet.</div>
               ) : (
-                <div className="card" style={{ padding: 0 }}>
-                  <table className="players available-players">
-                    <thead>
-                      <tr>
-                        <th>#</th>
-                        <th>Player</th>
-                        <th className="num">Pts</th>
-                        <th className="num">Season</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {lw.freeAgents.slice(0, 20).map((p, i) => (
-                        <tr key={`${p.id}-${i}`}>
-                          <td className="muted">{i + 1}</td>
-                          <td>
-                            <StateDot state={p.state} />
-                            {p.name}
-                            <span className="muted"> {[p.pos, p.nflTeam].filter(Boolean).join(" · ")}</span>
-                            <GameClock player={p} />
-                          </td>
-                          <td className="num"><PlayerPoints player={p} /></td>
-                          <td className="num">{p.seasonPoints != null ? fmt(p.seasonPoints) : "–"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <AvailablePlayers players={lw.freeAgents.slice(0, 20)} platform={platform} leagueId={leagueId} week={week} />
               )}
             </details>
           )}

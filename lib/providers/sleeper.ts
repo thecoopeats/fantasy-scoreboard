@@ -1,5 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { memo } from "@/lib/memo";
+import { buildGameLog, getTeamSchedule } from "@/lib/gameLog";
 import { gameFor, getGameStates, paceOf } from "@/lib/nfl";
 import {
   formatRecord,
@@ -7,6 +8,7 @@ import {
   progressOf,
   sortPlayers,
   toSide,
+  type GameLog,
   type LeagueWeek,
   type Matchup,
   type PlayerLine,
@@ -283,4 +285,58 @@ export async function getSleeperMatchups(sleeperUserId: string, season: string, 
   );
 
   return results.filter((m): m is Matchup => m !== null);
+}
+
+// One player's stats for each week of the season (undocumented Sleeper endpoint, keyed by week).
+async function fetchPlayerWeeks(playerId: string, season: string) {
+  const out = new Map<number, { stats: Record<string, number>; opponent?: string }>();
+  try {
+    const res = await fetch(
+      `https://api.sleeper.com/stats/nfl/player/${encodeURIComponent(playerId)}?season_type=regular&season=${season}&grouping=week`,
+      { next: { revalidate: 300 } }
+    );
+    if (!res.ok) return out;
+    const data = (await res.json()) as Record<string, { stats?: Record<string, number>; opponent?: string } | null>;
+    for (const [wk, row] of Object.entries(data ?? {})) {
+      const week = Number(wk);
+      if (Number.isInteger(week) && row?.stats) out.set(week, { stats: row.stats, opponent: row.opponent ?? undefined });
+    }
+  } catch {
+    // Fall back to the weekly stat files below.
+  }
+  return out;
+}
+
+// Week-by-week fantasy points for one player, in this league's scoring.
+export async function getSleeperGameLog(leagueId: string, season: string, playerId: string, throughWeek: number): Promise<GameLog> {
+  const [league, players, byWeek] = await Promise.all([
+    get<League>(`/league/${leagueId}`, 600),
+    getPlayers(),
+    fetchPlayerWeeks(playerId, season),
+  ]);
+  const scoring = league.scoring_settings ?? {};
+  const team = players[playerId]?.[2] || undefined;
+
+  // If the per-player endpoint gave nothing, read each week's stats for everyone (slower, but documented to work).
+  if (byWeek.size === 0) {
+    const weeks = Array.from({ length: throughWeek }, (_, i) => i + 1);
+    const lines = await Promise.all(weeks.map((w) => getWeekStats(season, w)));
+    weeks.forEach((w, i) => {
+      const st = lines[i][playerId];
+      if (st) byWeek.set(w, { stats: st });
+    });
+  }
+
+  const projection = await getProjectionStats(season, throughWeek);
+  const schedule = await getTeamSchedule(team, season);
+  const points = new Map<number, { points?: number; projected?: number; opponent?: string }>();
+  for (const [w, row] of byWeek) {
+    if (w > throughWeek) continue;
+    // Sleeper sends zeroed rows for weeks a player was inactive; only count weeks with a game played.
+    const played = row.stats.gp == null || row.stats.gp > 0;
+    points.set(w, { points: played ? scoreStats(row.stats, scoring) : undefined, opponent: row.opponent });
+  }
+  const proj = scoreStats(projection[playerId], scoring);
+  if (proj != null) points.set(throughWeek, { ...points.get(throughWeek), projected: proj });
+  return buildGameLog(throughWeek, points, schedule);
 }
