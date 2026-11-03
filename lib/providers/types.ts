@@ -146,3 +146,19 @@ export function sortPlayers(players: PlayerLine[]): PlayerLine[] {
   const bench = players.filter((p) => !p.starter).sort((a, b) => b.points - a.points);
   return [...starters, ...bench];
 }
+
+// One week of a player's season, in the league's scoring.
+export interface GameLogWeek {
+  week: number;
+  opponent?: string; // "KC" at home, "@KC" away
+  result?: string; // "W 27-20" once the NFL game is final
+  bye?: boolean;
+  points?: number; // undefined = no stats (didn't play, or game not played yet)
+  projected?: number;
+}
+
+export interface GameLog {
+  weeks: GameLogWeek[];
+  total: number;
+  gamesPlayed: number;
+}

@@ -1,5 +1,6 @@
+import { buildGameLog, getTeamSchedule } from "@/lib/gameLog";
 import { gameFor, getGameStates, paceOf } from "@/lib/nfl";
-import { formatRecord, liveProjection, progressOf, sortPlayers, toSide, type LeagueWeek, type Matchup, type PlayerLine, type TeamWeek } from "./types";
+import { formatRecord, type GameLog, liveProjection, progressOf, sortPlayers, toSide, type LeagueWeek, type Matchup, type PlayerLine, type TeamWeek } from "./types";
 
 // Yahoo Fantasy Sports API (official, OAuth 2.0):
 // https://developer.yahoo.com/fantasysports/guide/
@@ -367,4 +368,37 @@ export async function debugYahoo(token: string, season: string, week: number) {
     out.error = e instanceof Error ? e.message : String(e);
   }
   return out;
+}
+
+// Week-by-week fantasy points for one player, in this league's scoring. Yahoo returns one week per request.
+export async function getYahooGameLog(
+  token: string,
+  leagueKey: string,
+  season: string,
+  playerKey: string,
+  throughWeek: number
+): Promise<GameLog> {
+  const weeks = Array.from({ length: throughWeek }, (_, i) => i + 1);
+  const rows = await Promise.all(
+    weeks.map((w) =>
+      yget(
+        token,
+        `/league/${leagueKey}/players;player_keys=${playerKey}/stats;type=week;week=${w}`,
+        w < throughWeek ? 600 : 0 // past weeks rarely change
+      ).catch(() => null)
+    )
+  );
+  let nflTeam: string | undefined;
+  const points = new Map<number, { points?: number }>();
+  rows.forEach((json, i) => {
+    const p = findAll(json, "player").map(merge)[0];
+    if (!p) return;
+    if (p.editorial_team_abbr) nflTeam = String(p.editorial_team_abbr).toUpperCase();
+    // Yahoo reports 0 for weeks without a game; coverage_value tells us which week, stats tell us if they played.
+    const stats = findAll(p.player_stats, "stat");
+    const anyStat = stats.some((st) => (num(st?.value) ?? 0) !== 0);
+    const pts = num(p.player_points?.total);
+    points.set(weeks[i], { points: pts != null && (pts !== 0 || anyStat) ? pts : undefined });
+  });
+  return buildGameLog(throughWeek, points, await getTeamSchedule(nflTeam, season));
 }
