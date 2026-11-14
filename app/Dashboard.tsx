@@ -6,6 +6,7 @@ import type { Matchup, MatchupsResponse, Side } from "@/lib/providers/types";
 import Celebration, { type CelebrationEvent } from "./components/Celebration";
 import { ProgressLine } from "./components/GameProgress";
 import Lineups from "./components/Lineups";
+import { useAutoRefresh } from "./components/useAutoRefresh";
 import { REFRESH_IDLE_SECONDS, REFRESH_LIVE_SECONDS } from "@/lib/nfl";
 
 function fmt(n: number) {
@@ -109,8 +110,11 @@ export default function Dashboard({ initialWeek }: { initialWeek: number }) {
 
   const load = useCallback(async (w: number, quiet = false) => {
     if (!quiet) setLoading(true);
+    // A request left over from before the app was frozen can hang forever, so give up after a while.
+    const ctrl = new AbortController();
+    const timeout = setTimeout(() => ctrl.abort(), 20_000);
     try {
-      const res = await fetch(`/api/matchups?week=${w}`, { cache: "no-store" });
+      const res = await fetch(`/api/matchups?week=${w}`, { cache: "no-store", signal: ctrl.signal });
       if (res.status === 401) {
         window.location.href = "/login";
         return;
@@ -122,6 +126,7 @@ export default function Dashboard({ initialWeek }: { initialWeek: number }) {
     } catch {
       setFailed(true);
     } finally {
+      clearTimeout(timeout);
       setLoading(false);
     }
   }, []);
@@ -142,18 +147,8 @@ export default function Dashboard({ initialWeek }: { initialWeek: number }) {
     load(week);
   }, [week, load]);
 
-  // Poll fast while games are on, slowly otherwise; refresh right away when the tab comes back into view.
-  useEffect(() => {
-    const refresh = () => {
-      if (document.visibilityState === "visible") load(week, true);
-    };
-    const t = setInterval(refresh, (live ? REFRESH_LIVE_SECONDS : REFRESH_IDLE_SECONDS) * 1000);
-    document.addEventListener("visibilitychange", refresh);
-    return () => {
-      clearInterval(t);
-      document.removeEventListener("visibilitychange", refresh);
-    };
-  }, [week, live, load]);
+  // Poll fast while games are on, slowly otherwise; refresh right away when the app comes back into view.
+  useAutoRefresh(() => load(week, true), live ? REFRESH_LIVE_SECONDS : REFRESH_IDLE_SECONDS);
 
   const matchups = data?.week === week ? data.matchups : [];
   const winning = matchups.filter((m) => m.opponent && m.me.score > m.opponent.score).length;
