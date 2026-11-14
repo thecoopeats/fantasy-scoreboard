@@ -55,7 +55,6 @@ npm run dev
 
 Open http://localhost:3000.
 
-- `ALLOWED_EMAILS` is your invite list. Only those addresses can sign in. Leave it empty to allow anyone.
 - **Never change `ENCRYPTION_KEY`** once people have connected private ESPN leagues. Their saved cookies would become unreadable, and they'd have to re-add those leagues.
 
 ## 3b. Set up Yahoo (one time, by the site owner)
@@ -78,7 +77,7 @@ Open http://localhost:3000.
 2. At https://vercel.com, click **Add New → Project** and import the repository.
 3. Under **Environment Variables**, add the same four values as in `.env.local`, then click **Deploy**.
 4. Back in Supabase **URL Configuration**, set the **Site URL** to your Vercel URL and add it to **Redirect URLs**.
-5. Send your friends the link, and add their emails to `ALLOWED_EMAILS` in Vercel. Vercel needs a redeploy after you change environment variables.
+5. Send your friends the link. Anyone with an email address can sign in.
 
 ---
 
@@ -106,6 +105,6 @@ lib/
   providers/sleeper.ts      Sleeper API
   providers/espn.ts         ESPN API
   crypto.ts                 encryption for stored secrets
-  auth.ts                   session + invite list
+  auth.ts                   session helpers
 supabase/schema.sql         tables + row-level security
 ```
