@@ -92,8 +92,8 @@ export default function LeagueView({
               )}
               {g.b && (
                 <WinChance
-                  a={{ score: g.a.score, starters: lineupOf(g.a).starters }}
-                  b={{ score: g.b.score, starters: lineupOf(g.b).starters }}
+                  a={{ score: g.a.score, projected: g.a.projected, starters: lineupOf(g.a).starters }}
+                  b={{ score: g.b.score, projected: g.b.projected, starters: lineupOf(g.b).starters }}
                 />
               )}
               <Lineups a={lineupOf(g.a)} b={g.b ? lineupOf(g.b) : null} />

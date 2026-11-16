@@ -1,10 +1,4 @@
-import type { PlayerLine } from "@/lib/providers/types";
-import { winProbability } from "@/lib/providers/types";
-
-interface Team {
-  score: number;
-  starters: PlayerLine[];
-}
+import { winProbability, type WinTeam as Team } from "@/lib/providers/types";
 
 // Win chance for both teams of a matchup, as a split bar with percentages.
 export default function WinChance({ a, b }: { a: Team; b: Team }) {

@@ -69,10 +69,26 @@ function outlook(starters: PlayerLine[]): { mean: number; variance: number } {
 
 // Chance (0..1) that the first lineup beats the second, from current scores, projections and how much
 // of each player's game is left. Undefined when there is nothing to project from.
-export function winProbability(
-  a: { score: number; starters: PlayerLine[] },
-  b: { score: number; starters: PlayerLine[] },
-): number | undefined {
+// Some platforms (Yahoo) send only a team-level projection, not one per player. In that case the
+// team's expected remaining points are spread over its unfinished starters by game time left.
+function withPlayerProjections(t: WinTeam): WinTeam {
+  if (t.starters.some((p) => p.projected != null) || t.projected == null) return t;
+  const open = t.starters.filter((p) => p.state !== "done" && p.state !== "bye");
+  const left = open.reduce((n, p) => n + (p.state === "live" ? Math.max(0, 1 - (p.fraction ?? 0)) : 1), 0);
+  if (!left) return t;
+  const perGame = Math.max(0, t.projected - t.score) / left;
+  return { ...t, starters: t.starters.map((p) => (open.includes(p) ? { ...p, projected: perGame } : p)) };
+}
+
+export interface WinTeam {
+  score: number;
+  projected?: number; // team projection, used only when players have none
+  starters: PlayerLine[];
+}
+
+export function winProbability(a0: WinTeam, b0: WinTeam): number | undefined {
+  const a = withPlayerProjections(a0);
+  const b = withPlayerProjections(b0);
   const all = [...a.starters, ...b.starters];
   const finished = all.every((p) => p.state === "done" || p.state === "bye");
   if (!all.length) return undefined;

@@ -94,8 +94,8 @@ export function MatchupCard({ m }: { m: Matchup }) {
       {m.opponent ? <TeamRow side={m.opponent} /> : <div className="team muted">Bye week</div>}
       {m.opponent && (
         <WinChance
-          a={{ score: m.me.score, starters: m.me.starters ?? [] }}
-          b={{ score: m.opponent.score, starters: m.opponent.starters ?? [] }}
+          a={{ score: m.me.score, projected: m.me.projected, starters: m.me.starters ?? [] }}
+          b={{ score: m.opponent.score, projected: m.opponent.projected, starters: m.opponent.starters ?? [] }}
         />
       )}
       <Lineups
