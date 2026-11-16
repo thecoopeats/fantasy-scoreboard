@@ -39,6 +39,57 @@ export function liveProjection(players: PlayerLine[]): number | undefined {
   return Math.round(total * 100) / 100;
 }
 
+// Standard normal CDF (Abramowitz-Stegun 7.1.26 erf approximation).
+function normalCdf(z: number): number {
+  const x = Math.abs(z) / Math.SQRT2;
+  const t = 1 / (1 + 0.3275911 * x);
+  const erf = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x);
+  return z >= 0 ? 0.5 * (1 + erf) : 0.5 * (1 - erf);
+}
+
+// Expected final score and remaining uncertainty (variance) for one lineup.
+function outlook(starters: PlayerLine[]): { mean: number; variance: number } {
+  let mean = 0;
+  let variance = 0;
+  for (const p of starters) {
+    const proj = p.projected ?? 0;
+    if (p.state === "done" || p.state === "bye") {
+      mean += p.points;
+      continue;
+    }
+    const left = p.state === "live" ? Math.max(0, 1 - (p.fraction ?? 0)) : 1;
+    mean += p.points + proj * left;
+    // A player's weekly score varies by roughly half his projection plus a few points; that spread
+    // shrinks with the square root of the game still to play.
+    const sd = (0.5 * proj + 2.5) * Math.sqrt(left);
+    variance += sd * sd;
+  }
+  return { mean, variance };
+}
+
+// Chance (0..1) that the first lineup beats the second, from current scores, projections and how much
+// of each player's game is left. Undefined when there is nothing to project from.
+export function winProbability(
+  a: { score: number; starters: PlayerLine[] },
+  b: { score: number; starters: PlayerLine[] },
+): number | undefined {
+  const all = [...a.starters, ...b.starters];
+  const finished = all.every((p) => p.state === "done" || p.state === "bye");
+  if (!all.length) return undefined;
+  if (!finished && !all.some((p) => p.projected != null)) return undefined;
+  const oa = outlook(a.starters);
+  const ob = outlook(b.starters);
+  // Use the platform's own score total, which can include bonuses the player lines miss.
+  const gapNow = a.score - b.score;
+  const gapLines = oa.mean - ob.mean;
+  const sumA = a.starters.reduce((t, p) => t + p.points, 0);
+  const sumB = b.starters.reduce((t, p) => t + p.points, 0);
+  const diff = gapLines + (gapNow - (sumA - sumB));
+  const sd = Math.sqrt(oa.variance + ob.variance);
+  if (sd < 0.01) return diff > 0 ? 1 : diff < 0 ? 0 : 0.5;
+  return normalCdf(diff / sd);
+}
+
 // Lineup display order. Anything not listed (e.g. IDP slots) goes after DEF.
 const SLOT_ORDER = ["QB", "RB", "WR", "TE", "FLEX", "WRRB_FLEX", "REC_FLEX", "SUPER_FLEX", "K", "DEF"];
 

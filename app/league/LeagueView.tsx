@@ -3,6 +3,7 @@ import type { LeagueWeek, PlayerLine, TeamWeek } from "@/lib/providers/types";
 import { PlayerPoints, ProgressLine, StateDot } from "../components/GameProgress";
 import GameClock from "../components/GameClock";
 import Lineups from "../components/Lineups";
+import WinChance from "../components/WinChance";
 import AvailablePlayers from "./AvailablePlayers";
 
 const fmt = (n: number) => n.toFixed(2);
@@ -88,6 +89,12 @@ export default function LeagueView({
                 <TeamLine team={g.b} mine={isMine(g.b)} leading={g.b.score > g.a.score} />
               ) : (
                 <div className="team muted">Bye week</div>
+              )}
+              {g.b && (
+                <WinChance
+                  a={{ score: g.a.score, starters: lineupOf(g.a).starters }}
+                  b={{ score: g.b.score, starters: lineupOf(g.b).starters }}
+                />
               )}
               <Lineups a={lineupOf(g.a)} b={g.b ? lineupOf(g.b) : null} />
             </div>

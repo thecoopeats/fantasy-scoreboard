@@ -90,7 +90,7 @@ Open http://localhost:3000.
 | ESPN (private league) | League ID + `espn_s2` and `SWID` cookies | Cookies are encrypted with AES-256-GCM before they're saved. The team is detected automatically. The cookies expire eventually and must be re-added when they do. |
 | Yahoo | Clicks **Connect Yahoo** and approves | Official API through Yahoo's login flow (OAuth). Tokens are encrypted before they're saved and refresh automatically every hour. Includes every Yahoo league they're in this season. |
 
-Scores refresh every 60 seconds while the page is open.
+Scores refresh every 60 seconds while the page is open. Each matchup also shows a live win chance, estimated from current scores, projections and how much of each starter's game is left.
 
 ## Project layout
 

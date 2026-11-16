@@ -122,6 +122,11 @@ code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font-si
 .matchup.winning .team.me .score { color: var(--win); }
 .matchup.losing .team.me .score { color: var(--lose); }
 
+.winchance { display: flex; align-items: center; gap: 10px; padding: 2px 16px 10px; font-size: 0.8rem; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+.winchance .lead { color: var(--text); }
+.winchance .bar { flex: 1; height: 6px; border-radius: 3px; background: var(--lose); overflow: hidden; opacity: 0.85; }
+.winchance .fill { height: 100%; background: var(--win); transition: width 0.4s; }
+
 .empty { text-align: center; padding: 32px 16px; }
 
 .matchup .head .links { display: flex; gap: 14px; flex-shrink: 0; }

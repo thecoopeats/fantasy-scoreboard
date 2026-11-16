@@ -6,6 +6,7 @@ import type { Matchup, MatchupsResponse, Side } from "@/lib/providers/types";
 import Celebration, { type CelebrationEvent } from "./components/Celebration";
 import { ProgressLine } from "./components/GameProgress";
 import Lineups from "./components/Lineups";
+import WinChance from "./components/WinChance";
 import { useAutoRefresh } from "./components/useAutoRefresh";
 import { REFRESH_IDLE_SECONDS, REFRESH_LIVE_SECONDS } from "@/lib/nfl";
 
@@ -91,6 +92,12 @@ export function MatchupCard({ m }: { m: Matchup }) {
       </div>
       <TeamRow side={m.me} me />
       {m.opponent ? <TeamRow side={m.opponent} /> : <div className="team muted">Bye week</div>}
+      {m.opponent && (
+        <WinChance
+          a={{ score: m.me.score, starters: m.me.starters ?? [] }}
+          b={{ score: m.opponent.score, starters: m.opponent.starters ?? [] }}
+        />
+      )}
       <Lineups
         a={{ teamName: m.me.teamName, starters: m.me.starters ?? [] }}
         b={m.opponent ? { teamName: m.opponent.teamName, starters: m.opponent.starters ?? [] } : null}
